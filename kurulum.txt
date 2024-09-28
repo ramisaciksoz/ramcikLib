@@ -25,6 +25,10 @@ pip install -i https://test.pypi.org/simple/ AutomationHandler-ramcik
 bu şekilde bilgisayarında bu kütüphaneyi güncellemiş oldun.
 
 
+5. git'e yüklemek;
+-terminale """     git add .     """
+- sonra """   git commit -m "commit mesajinizi buraya yazın... "   """ 
+- """    git push    """
 
 kütüphane yapımı ile genel herşey aşağıdaki linkte
 https://packaging.python.org/en/latest/tutorials/packaging-projects/
