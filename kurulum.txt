@@ -31,4 +31,4 @@ bu şekilde bilgisayarında bu kütüphaneyi güncellemiş oldun.
 - """    git push    """
 
 kütüphane yapımı ile genel herşey aşağıdaki linkte
-https://packaging.python.org/en/latest/tutorials/packaging-projects/
+https://packaging.python.org/en/latest/tutorials/packaging-projects/    
