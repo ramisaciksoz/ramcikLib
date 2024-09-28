@@ -1,0 +1,30 @@
+eğer kodu değiştirdiysen;
+
+-0. pyproject.toml içindeki 
+	
+	version = "0.0.6" kısmını güncelle öğrenğin  version = "0.0.7"  yap.
+
+-1.  Build gerekiyor tırnak içindekiyle yap "py -m build",  
+terminalin yolu kütüphanenin içinde olacak.
+
+-2.   py -m twine upload --repository testpypi dist/*
+ yukarıdaki kodu terminalde çalıştır ve sonrasında da tokeni gir.
+token burdaki token.txt dosyasında bulabilirsin.
+token:pypi-AgENdGVzdC5weXBpLm9yZwIkNDI5NzllZGYtNGNlOS00MmY1LWI4MTYtMGQ4MmE5ZGYxMTIxAAIqWzMsImYyODY3NjcxLTQxMTItNDJmYi05N2VjLTQzNTEwMGY4NmVmZCJdAAAGIIklG3zsfQA4I9zOAJcegzSicUCHtK5W3aQYUC_GhULL
+
+-3. test sitesinden versiyon güncellenmiş mi diye kontrol et. (https://test.pypi.org/)
+
+-4. güncellenmişse, bilgisayarındaki eski versiyonu sil.
+örneğin,
+pip uninstall https://test.pypi.org/simple/ AutomationHandler-ramcik
+
+sonra bi daha yükle
+
+pip install -i https://test.pypi.org/simple/ AutomationHandler-ramcik
+
+bu şekilde bilgisayarında bu kütüphaneyi güncellemiş oldun.
+
+
+
+kütüphane yapımı ile genel herşey aşağıdaki linkte
+https://packaging.python.org/en/latest/tutorials/packaging-projects/
