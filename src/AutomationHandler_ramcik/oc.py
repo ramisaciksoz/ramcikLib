@@ -599,7 +599,7 @@ def check_whatsapp_online_status(
     return status_info
 
 
-def get_last_message(phone_number: str, driver: webdriver.WebDriver) -> str | None:
+def get_last_message(phone_number: str, driver: webdriver) -> str | None:
     """
     Fetch the last received message from a WhatsApp chat for a specific phone number.
 
