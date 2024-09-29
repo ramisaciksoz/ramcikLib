@@ -39,7 +39,7 @@ import pyautogui
 
 ##################### Whatsapp fonksiyonları ############################
 
-def create_webdriver_with_profile(chrome_profile_path = "", profile_default = 1, headless = ""):
+def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default: int = 1, headless: bool = False) -> webdriver:
     """
     Creates a WebDriver object using Chrome with profile.
 
@@ -90,7 +90,7 @@ def create_webdriver_with_profile(chrome_profile_path = "", profile_default = 1,
 
 
 
-def check_for_qr_code(driver):
+def check_for_qr_code(driver: webdriver) -> bool:
     """
     Checks if the WhatsApp Web page is requesting a QR code scan or if the user is already logged in.
     
@@ -165,14 +165,14 @@ def check_for_qr_code(driver):
 
 
 
-def send_message_to_number(phone_number, message, driver):
+def send_message_to_number(phone_number: str, message: str, driver: webdriver) -> tuple[bool, Exception | None]:
     """
     Sends a WhatsApp message to a specified phone number using Selenium WebDriver.
 
     Args:
         phone_number (str): The phone number to which the message should be sent. 
                             The format should include the country code without any leading '+'.
-                            Example: '905xxxxxxxxx' for a Turkish phone number.
+                            Example: '+905xxxxxxxxx' for a Turkish phone number.
         message (str): The text message to send.
         driver (selenium.webdriver): An instance of Selenium WebDriver with an active session of WhatsApp Web.
 
@@ -228,7 +228,8 @@ def send_message_to_number(phone_number, message, driver):
         traceback.print_exc()  # Ayrıntılı hata mesajı
         return False,e
 
-def send_message_to_someone_or_group(someone_or_group_name, message, driver):
+
+def send_message_to_someone_or_group(someone_or_group_name: str, message: str, driver: webdriver) -> tuple[bool, Exception | None]:
     """
     Sends a message to a specific person or WhatsApp group using Selenium WebDriver.
 
@@ -316,7 +317,7 @@ def send_message_to_someone_or_group(someone_or_group_name, message, driver):
         return False,e
 
 
-def send_file_to_someone_or_group(someone_or_group_name, file_path, driver):
+def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, driver: webdriver) -> tuple[bool, Exception | None]:
     """
     Sends a file (e.g., image, video, PDF, document) to a specified WhatsApp group or **individual contact** using Selenium WebDriver.
 
@@ -396,7 +397,13 @@ def send_file_to_someone_or_group(someone_or_group_name, file_path, driver):
         file_input = WebDriverWait(driver, 50).until(
             EC.presence_of_element_located((By.XPATH, "//input[@accept='image/*,video/mp4,video/3gpp,video/quicktime']"))
         )
-        file_input.send_keys(file_path)  # Dosya dosyasını yükle
+
+        if os.path.isabs(file_path):
+            absolute_file_path = file_path  # If it's already absolute, use it as is
+        else:
+            absolute_file_path = os.path.abspath(file_path)  # If it's relative, convert it to an absolute path
+
+        file_input.send_keys(absolute_file_path)  # Dosya dosyasını yükle
         print("file_path bulundu.")
 
         # Gönder butonuna tıkla
@@ -426,7 +433,7 @@ def send_file_to_someone_or_group(someone_or_group_name, file_path, driver):
         traceback.print_exc()  # Ayrıntılı hata mesajı
         return False,e
 
-def notify_phone_number(phone_number, message, chrome_profile_path = ""):
+def notify_phone_number(phone_number: str, message: str, chrome_profile_path: str = ""):
 
     """
     Sends a WhatsApp message to a specified phone number via WhatsApp Web using a WebDriver.
@@ -498,7 +505,14 @@ def notify_phone_number(phone_number, message, chrome_profile_path = ""):
 
 
 
-def check_whatsapp_online_status(phone_number, driver, wait_time=20, retry_attempts=3, delay_between_retries=3, take_screenshot_on_error=False):
+def check_whatsapp_online_status(
+    phone_number: str, 
+    driver: webdriver, 
+    wait_time: int = 20, 
+    retry_attempts: int = 3, 
+    delay_between_retries: int = 3, 
+    take_screenshot_on_error: bool = False
+) -> dict[str, int | str | None]:
     """
     Check the online status of a WhatsApp user using Selenium WebDriver.
 
@@ -585,7 +599,7 @@ def check_whatsapp_online_status(phone_number, driver, wait_time=20, retry_attem
     return status_info
 
 
-def get_last_message(phone_number, driver) -> str:
+def get_last_message(phone_number: str, driver: webdriver.WebDriver) -> str | None:
     """
     Fetch the last received message from a WhatsApp chat for a specific phone number.
 
@@ -655,7 +669,7 @@ def get_last_message(phone_number, driver) -> str:
     return str(last_message_text)
 
 
-def get_whatsapp_chat_history(phone_number, driver):
+def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]:
     """
     Retrieve chat history from a WhatsApp chat for a specific phone number.
 
@@ -723,7 +737,7 @@ def get_whatsapp_chat_history(phone_number, driver):
 
 
 
-def send_email(Subject, text, sender_email = "", app_password = "", receiver_email = ""):
+def send_email(Subject: str, text: str, sender_email: str = "", app_password: str = "", receiver_email: str = "") -> bool:
     """
     Sends an email using Gmail's SMTP server with the option to specify sender and receiver email addresses
     and an application-specific password. If any of these are not provided, the function will attempt to
@@ -833,7 +847,7 @@ def send_email(Subject, text, sender_email = "", app_password = "", receiver_ema
         return False
 
 
-def send_email_with_attachments(subject, text, attachment_files, receiver_email, sender_email = "", app_password = ""): 
+def send_email_with_attachments(subject: str, text: str, attachment_files: str, receiver_email: str, sender_email: str = "", app_password: str = "") -> bool: 
     """
     Sends an email with optional file attachments using Gmail's SMTP server.
 
@@ -957,7 +971,16 @@ def send_email_with_attachments(subject, text, attachment_files, receiver_email,
 ##################### Telegram fonksiyonları ############################
 
 
-def telegram_send_message(message, recipient=None, recipient_phone=None, my_phone_number=None, api_id=None, api_hash=None, token=None, chat_id=None):
+def telegram_send_message(
+    message: str, 
+    recipient: str = None, 
+    recipient_phone: str = None, 
+    my_phone_number: str = None, 
+    api_id: str = None, 
+    api_hash: str = None, 
+    token: str = None, 
+    chat_id: str = None
+) -> bool:
     """
     A function that sends a message via Telegram. It works with either the recipient's username (recipient) or phone number (recipient_phone).
     
@@ -1024,7 +1047,7 @@ def telegram_send_message(message, recipient=None, recipient_phone=None, my_phon
         client.disconnect()
 
 
-def send_telegram_bot_message_to_self(message, bot_token = None, chat_id = None):
+def send_telegram_bot_message_to_self(message: str, bot_token: str = None, chat_id: str = None) -> bool:
     """
     Sends a message to yourself using a Telegram bot, which can trigger a notification on your device.
 
@@ -1095,7 +1118,7 @@ def send_telegram_bot_message_to_self(message, bot_token = None, chat_id = None)
 ##################### Tool fonksiyonları ############################
 
 
-def capture_full_page_screenshot(driver, screenshot_name):
+def capture_full_page_screenshot(driver: webdriver, screenshot_name: str) -> str:
     """
     Captures a full-page screenshot using Selenium, stitches the screenshots together,
     draws a visible line between each screenshot, and deletes temporary files.
@@ -1188,7 +1211,7 @@ def capture_full_page_screenshot(driver, screenshot_name):
     return screenshot_name_with_time
 
 
-def record_screen(duration, output_name):
+def record_screen(duration: int | float, output_name: str):
     """
     Records the screen for a specified duration and saves it as a video file.
 
@@ -1252,7 +1275,7 @@ def record_screen(duration, output_name):
     cv2.destroyAllWindows()
 
 
-def extract_text_from_image_with_google(image_path):
+def extract_text_from_image_with_google(image_path: str) -> str:
     """
     Extracts text from an image using Google Cloud Vision API.
 
@@ -1305,7 +1328,7 @@ def extract_text_from_image_with_google(image_path):
 
 
 
-def text_recognition_captcha_solver(driver, screenshot_name):
+def text_recognition_captcha_solver(driver: webdriver, screenshot_name: str):
     """
     Solves a CAPTCHA by taking a screenshot of the CAPTCHA image, extracting the text from the image 
     using Google Cloud Vision API, and inputting the extracted text into the CAPTCHA input field.
@@ -1369,7 +1392,7 @@ def text_recognition_captcha_solver(driver, screenshot_name):
         # Handle the case where the CAPTCHA image or input field is not found
         print(f"Captcha image not found or unable to locate the input field.")
 
-def count_string_occurrences_in_html(driver, search_string):
+def count_string_occurrences_in_html(driver: webdriver, search_string: str) -> int:
     """
     Count the occurrences of a specific string within the HTML content of a webpage.
 
