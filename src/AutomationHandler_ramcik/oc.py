@@ -585,7 +585,7 @@ def check_whatsapp_online_status(phone_number, driver, wait_time=20, retry_attem
     return status_info
 
 
-def get_last_message(phone_number, driver):
+def get_last_message(phone_number, driver) -> str:
     """
     Fetch the last received message from a WhatsApp chat for a specific phone number.
 
@@ -652,7 +652,7 @@ def get_last_message(phone_number, driver):
         print(f"Error loading chat: {e}")
         last_message_text = None
 
-    return last_message_text
+    return str(last_message_text)
 
 
 def get_whatsapp_chat_history(phone_number, driver):
@@ -801,6 +801,17 @@ def send_email(Subject, text, sender_email = "", app_password = "", receiver_ema
             print("""Çevresel değişkenlerde 'MY_GMAIL' bulunamadı veya 'receiver_email' sağlanmadı. Lütfen birini temin edin.""")
             return False
     
+    try:
+        # Check if error_data is not a string and convert it to a string if necessary
+        if not isinstance(text, str):
+            text = str(text)
+    except Exception as conversion_error:
+        # Raise an exception if conversion to string fails
+        raise ValueError(f"Failed to convert error_data to a string: {conversion_error}")
+    
+    # Construct the email body
+    text = f"Error occurred: {text}"
+
     # Email içeriği
     message = MIMEMultipart("alternative")
     message["Subject"] = Subject
@@ -889,6 +900,17 @@ def send_email_with_attachments(subject, text, attachment_files, receiver_email,
     msg['From'] = from_email  # Gönderenin e-posta adresini belirle
     msg['To'] = receiver_email  # Alıcının e-posta adresini belirle
     msg['Subject'] = subject  # E-postanın konusunu belirle
+
+    try:
+        # Check if error_data is not a string and convert it to a string if necessary
+        if not isinstance(text, str):
+            text = str(text)
+    except Exception as conversion_error:
+        # Raise an exception if conversion to string fails
+        raise ValueError(f"Failed to convert error_data to a string: {conversion_error}")
+    
+    # Construct the email body
+    text = f"Error occurred: {text}"
 
     # Mesaj gövdesini ekle
     msg.attach(MIMEText(text, 'plain', 'utf-8'))  # E-posta gövdesini düz metin olarak ekle
