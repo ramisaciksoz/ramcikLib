@@ -534,13 +534,14 @@ def check_whatsapp_online_status(
               - 'online': True/False, if the user is currently online.
               - 'status': "online", "typing...", "offline", "last seen", "unavailable".
               - 'error': If an exception occurred, the error message will be logged here.
+              - 'exception_occurred': True/False, indicator if an exception was raised during execution.
 
     Example usage:
         driver = webdriver.Chrome()
         check_whatsapp_online_status('+905551234567', driver, wait_time=30, retry_attempts=5)
     """
 
-    status_info = {"online": False, "status": "offline", "error": None}
+    status_info = {"online": False, "status": "offline", "error": None, "exception_occurred": False}
     
     # Format the URL to open the chat with the provided phone number
     try:
@@ -590,6 +591,7 @@ def check_whatsapp_online_status(
         except Exception as e:
             # Handle any other exceptions, including connectivity issues
             status_info["error"] = str(e)
+            status_info["exception_occurred"] = True  # Indicator that an exception occurred
             print(f"Error checking status for {phone_number}: {e}")
             if attempt + 1 < retry_attempts:
                 print(f"Retrying after {delay_between_retries} seconds...")
@@ -602,6 +604,7 @@ def check_whatsapp_online_status(
                 break
 
     return status_info
+
 
 
 def get_last_message(phone_number: str, driver: webdriver) -> str | None:
