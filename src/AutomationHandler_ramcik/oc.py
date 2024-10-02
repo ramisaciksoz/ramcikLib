@@ -433,7 +433,7 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
         traceback.print_exc()  # Ayrıntılı hata mesajı
         return False,e
 
-def notify_phone_number(phone_number: str, message: str, chrome_profile_path: str = ""):
+def notify_phone_number(phone_number: str, message: str, chrome_profile_path: str = "", headless: bool = False):
 
     """
     Sends a WhatsApp message to a specified phone number via WhatsApp Web using a WebDriver.
@@ -447,17 +447,21 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
     Args:
         phone_number (str): The phone number to which the message should be sent.
         message (str): The content of the message to be sent.
-        chrome_profile_path (str, optional): The file path to the Chrome user profile to be used.
+        chrome_profile_path (str, optional): The file path to the Chrome user profile to be used. 
+                                             If not provided, the function will use environment variables for profile paths.
+        headless (bool, optional): If True, runs the WebDriver in headless mode (without a GUI). 
+                                   Defaults to False.
 
     Behavior:
         1. Checks if the provided phone number is the user's own number by comparing it with the environment variable 'MY_NUMBER'.
         2. Selects the appropriate Chrome profile directory based on whether the phone number belongs to the user or another person:
             - If it's the user's phone number, uses the 'CHROME_SECONDARY_WHATSAPP_PROFILE_PATH' environment variable to send the message from another WhatsApp account.
             - Otherwise, uses the 'CHROME_PRIMARY_WHATSAPP_PROFILE_PATH' environment variable.
-        3. Creates a WebDriver instance with the selected Chrome profile.
-        4. Checks for the presence of a QR code on WhatsApp Web, which indicates that a login is required.
+        3. If the 'chrome_profile_path' argument is provided, it overrides the default profile selection.
+        4. Creates a WebDriver instance with the selected Chrome profile, optionally running in headless mode if specified.
+        5. Checks for the presence of a QR code on WhatsApp Web, which indicates that a login is required.
             - If a QR code is detected, the function sends an email notification with the subject "WhatsApp Login Alert" and stops further execution.
-        5. If no QR code is detected, it attempts to send the message using the `send_message_to_number` function.
+        6. If no QR code is detected, it attempts to send the message using the `send_message_to_number` function.
             - If the message is successfully sent, the function ends.
             - If the message cannot be sent, the function sends an email notification with details about the failure.
 
@@ -475,6 +479,7 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
 
     Example usage:
         notify_phone_number("+905xxxxxxxxx", "Hello, this is a test message.")
+        notify_phone_number("+905xxxxxxxxx", "This is a headless test message.", headless=True)
     """
 
     if phone_number == os.getenv('MY_NUMBER'): # Benim telefon numaramsa
@@ -487,7 +492,7 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
     if chrome_profile_path == "" or chrome_profile_path is None:
         raise ValueError("Profil yolu sağlanmadı ve ortam değişkenleri ayarlanmadı. ikisinden biri yapılmalı.")
 
-    driver = create_webdriver_with_profile(chrome_profile_path)
+    driver = create_webdriver_with_profile(chrome_profile_path, headless = headless)
 
     # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
     qr_exists = check_for_qr_code(driver)
