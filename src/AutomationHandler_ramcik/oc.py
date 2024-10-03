@@ -855,7 +855,7 @@ def send_email(Subject: str, text: str, sender_email: str = "", app_password: st
         return False
 
 
-def send_email_with_attachments(subject: str, text: str, attachment_files: str, receiver_email: str, sender_email: str = "", app_password: str = "") -> bool: 
+def send_email_with_attachments(subject: str, text: str, attachment_files: list, receiver_email: str, sender_email: str = "", app_password: str = "") -> bool: 
     """
     Sends an email with optional file attachments using Gmail's SMTP server.
 
@@ -939,6 +939,13 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: str, 
     try:
         # Dosya eklerini ekle
         for file_path in attachment_files:
+
+            if os.path.isabs(file_path):
+                absolute_file_path = file_path  # If it's already absolute, use it as is
+            else:
+                absolute_file_path = os.path.abspath(file_path)  # If it's relative, convert it to an absolute path
+                file_path = absolute_file_path
+                
             # Dosyayı oku ve MIMEBase nesnesi oluştur
             part = MIMEBase('application', 'octet-stream')  # MIMEBase kullanarak ek oluştur
             with open(file_path, 'rb') as attachment:  # Dosyayı okuma modunda aç
