@@ -557,7 +557,7 @@ def check_whatsapp_online_status(
             # Wait for the chat to load and check for the user's online or typing status
             status_element = WebDriverWait(driver, wait_time).until(
                 EC.visibility_of_element_located((
-                    By.XPATH, "//span[@title='online' or @title='çevrimiçi' or contains(@title, 'typing') or contains(@title, 'yazıyor')]"
+                    By.XPATH, f"//div[@id='main']//span[@title='online' or @title='çevrimiçi' or contains(@title, 'typing') or contains(@title, 'yazıyor')]"
                 ))
             )
 
@@ -831,8 +831,6 @@ def send_email(Subject: str, text: str, sender_email: str = "", app_password: st
         # Raise an exception if conversion to string fails
         raise ValueError(f"Failed to convert error_data to a string: {conversion_error}")
     
-    # Construct the email body
-    text = f"Error occurred: {text}"
 
     # Email içeriği
     message = MIMEMultipart("alternative")
@@ -931,8 +929,6 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: list,
         # Raise an exception if conversion to string fails
         raise ValueError(f"Failed to convert error_data to a string: {conversion_error}")
     
-    # Construct the email body
-    text = f"Error occurred: {text}"
 
     # Mesaj gövdesini ekle
     msg.attach(MIMEText(text, 'plain', 'utf-8'))  # E-posta gövdesini düz metin olarak ekle
