@@ -950,8 +950,8 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: list,
             # Eki kodla ve başlık bilgilerini ekle
             encoders.encode_base64(part)  # Dosyayı Base64 formatında kodla
             part.add_header(
-                'Content-Disposition',  # İçerik başlığını ekle
-                f'attachment; filename= {file_path}',  # Dosya adını belirt
+                'Content-Disposition',  
+                f'attachment; filename= {os.path.basename(file_path)}',  # Sadece dosya adı ve uzantısını belirt
             )
 
             msg.attach(part)  # Ekleri e-posta mesajına ekle
@@ -1129,97 +1129,113 @@ def send_telegram_bot_message_to_self(message: str, bot_token: str = None, chat_
 ##################### Tool fonksiyonları ############################
 
 
-def capture_full_page_screenshot(driver: webdriver, screenshot_name: str) -> str:
+def capture_full_page_screenshot(driver: webdriver, full_screenshot_path: str = None) -> str:
     """
-    Captures a full-page screenshot using Selenium, stitches the screenshots together,
-    draws a visible line between each screenshot, and deletes temporary files.
+    Captures a full-page screenshot using Selenium, stitches the screenshots together, 
+    and saves it to the specified file path. If no path is provided, a default file name 
+    with a timestamp is generated, and the screenshot is saved in the current working directory.
 
     Parameters:
         driver: Selenium WebDriver instance
-        screenshot_name: Base name for the screenshot file (a timestamp will be added)
+            The Selenium WebDriver instance controlling the browser.
+            
+        full_screenshot_path: str, optional
+            The full file path where the screenshot should be saved, including the directory and file name.
+            If a file name without an extension is provided, '.png' will be automatically appended.
+            If this parameter is not provided, the screenshot will be saved in the current directory
+            with a default file name that includes a timestamp.
     
     Returns:
-        screenshot_name_with_time: The filename of the saved full-page screenshot
-        example: jonny_2024-09-25_20-21-18.png
+        str: The full path to the saved screenshot file.
+
+    Raises:
+        OSError: If there is an issue creating the directory or saving the file.
+
+    Examples:
+        # Example 1: Save screenshot with a custom file name and path
+        capture_full_page_screenshot(driver, "C:/Screenshots/my_screenshot.png")
+
+        # Example 2: Save screenshot with a custom file name (without extension)
+        capture_full_page_screenshot(driver, "C:/Screenshots/screenshot")
+
+        # Example 3: Save screenshot in the current directory with an auto-generated name
+        capture_full_page_screenshot(driver)
     """
 
-    # 1. Ensure the page is fully loaded by checking document.readyState
+    # Ensure the page is fully loaded
     WebDriverWait(driver, 30).until(lambda d: driver.execute_script('return document.readyState') == 'complete')
 
-    # 2. Additionally, check if the 'body' tag has fully loaded
-    WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+    # Get the current timestamp and create a unique screenshot filename if full path is not provided
+    if not full_screenshot_path:
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        full_screenshot_path = os.path.join(os.getcwd(), f"_screenshot_{current_time}.png")
+    else:
+        # Check if the path contains a valid file extension, and add '.png' if it's missing
+        if not full_screenshot_path.endswith(".png"):  # Eğer dosya adı uzantı içermiyorsa
+            full_screenshot_path += ".png"  # Otomatik olarak '.png' ekle
 
-    # 3. Get the current timestamp and use it to create a unique screenshot filename
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    screenshot_name_with_time = f"{screenshot_name}_{current_time}.png"
+    # Create directory if it doesn't exist
+    screenshot_dir = os.path.dirname(full_screenshot_path)
+    if screenshot_dir and not os.path.exists(screenshot_dir):
+        os.makedirs(screenshot_dir)
 
-    # 4. Get the total page height (scroll height) and the viewport height
+    # Get the total page height (scroll height) and the viewport height
     total_height = driver.execute_script("return document.documentElement.scrollHeight")
     viewport_height = driver.execute_script("return window.innerHeight")
 
-    # 5. Maximize the browser window to ensure full viewport visibility
+    # Maximize the browser window to ensure full viewport visibility
     driver.maximize_window()
     time.sleep(2)  # Wait to ensure the window is fully maximized
 
-    # 6. Create an empty list to hold the temporary screenshot files
+    # Create an empty list to hold the temporary screenshot files
     screenshots = []
     
-    # 7. Scroll through the page and take screenshots
+    # Scroll through the page and take screenshots
     scroll_position = 0
     while scroll_position < total_height:
-        # 8. Scroll the page to the current position
+        # Scroll the page to the current position
         driver.execute_script(f"window.scrollTo(0, {scroll_position});")
         time.sleep(1)  # Wait for content to load after scrolling
 
-        # 9. Check if new content has loaded after scrolling
-        new_total_height = driver.execute_script("return document.documentElement.scrollHeight")
-
-        # 10. Save the screenshot to a temporary file
+        # Save the screenshot to a temporary file
         screenshot_file = f"temp_screenshot_{scroll_position}.png"
         driver.save_screenshot(screenshot_file)
         screenshots.append(screenshot_file)
 
-        # 11. If new content has loaded (dynamic loading), update the total height
-        if new_total_height > total_height:
-            total_height = new_total_height
-
-        # 12. Move to the next scroll position
+        # Move to the next scroll position
         scroll_position += viewport_height
 
-    # 13. Determine the correct width and height for the final stitched image
+    # Determine the correct width and height for the final stitched image
     window_width = driver.execute_script("return window.innerWidth")
-    
-    # 14. Create a blank image to stitch the screenshots together, adding 10 pixels for the divider line between each screenshot
     total_image_height = total_height + (len(screenshots) - 1) * 10  # Add space for the divider lines
     full_screenshot = Image.new('RGB', (window_width, total_image_height))
-    
-    # 15. Stitch the screenshots together, drawing a red line between each one
+
+    # Stitch the screenshots together, drawing a red line between each one
     y_offset = 0
     for idx, screenshot in enumerate(screenshots):
         img = Image.open(screenshot)
         
-        # 16. Paste the screenshot onto the final image
+        # Paste the screenshot onto the final image
         full_screenshot.paste(img, (0, y_offset))
         y_offset += img.size[1]
         
-        # 17. If this is not the last screenshot, draw a red divider line
+        # Draw a red divider line between each screenshot
         if idx < len(screenshots) - 1:
             draw = ImageDraw.Draw(full_screenshot)
-            # Draw a red line (RGB: 255, 0, 0) with 10-pixel thickness
             draw.line([(0, y_offset), (window_width, y_offset)], fill=(255, 0, 0), width=10)
             y_offset += 10  # Add space for the line
 
         img.close()
 
-    # 18. Save the full-page screenshot
-    full_screenshot.save(screenshot_name_with_time)
-    print("Full-page screenshot captured with red dividers added.")
+    # Save the full-page screenshot to the specified path
+    full_screenshot.save(full_screenshot_path)
+    print(f"Full-page screenshot captured and saved at {full_screenshot_path}.")
 
-    # 19. Delete temporary screenshot files, leaving only the final full screenshot
+    # Delete temporary screenshot files
     for screenshot in screenshots:
         os.remove(screenshot)
 
-    return screenshot_name_with_time
+    return full_screenshot_path
 
 
 def record_screen(duration: int | float, output_name: str):
