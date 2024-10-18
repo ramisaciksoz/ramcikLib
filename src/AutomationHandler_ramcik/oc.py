@@ -1419,27 +1419,52 @@ def text_recognition_captcha_solver(driver: webdriver, screenshot_name: str):
         # Handle the case where the CAPTCHA image or input field is not found
         print(f"Captcha image not found or unable to locate the input field.")
 
-def count_string_occurrences_in_html(driver: webdriver, search_string: str) -> int:
+def count_string_occurrences_in_html(driver: webdriver, search_string: str, timeout: int = 10) -> int:
     """
-    Count the occurrences of a specific string within the HTML content of a webpage.
+    Count the occurrences of a specific string within the HTML content of a webpage after ensuring
+    that the page has fully loaded and the content has dynamically changed if applicable.
+
+    This function first ensures the webpage has fully loaded by checking the `document.readyState`
+    and waits for any dynamic changes in the HTML source before counting the occurrences of the 
+    specified string.
 
     Parameters:
     driver (WebDriver): The Selenium WebDriver instance used to interact with the webpage.
-    search_string (str): The string to search for in the page's HTML source.
+    search_string (str): The string to search for in the updated HTML source of the page.
+    timeout (int, optional): Maximum time (in seconds) to wait for the page load and content update. 
+                             Defaults to 10 seconds.
 
     Returns:
-    int: The number of times the search_string appears in the HTML source of the page.
+    int: The number of times the search_string appears in the updated HTML source of the page.
     """
     
+    # Sayfanın tam olarak yüklendiğinden emin olun
+    WebDriverWait(driver, timeout).until(
+        lambda d: d.execute_script('return document.readyState') == 'complete'
+    )
+
     # Sayfanın tam olarak yüklenmesini bekleyin
-    WebDriverWait(driver, 10).until(
+    WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.TAG_NAME, 'body'))
     )
 
     # Sayfanın HTML kodunu alın
-    page_source = driver.page_source
+    initial_page_source = driver.page_source
 
-    # Aranan string'in HTML içinde kaç kez geçtiğini sayın
-    count = page_source.count(search_string)
+    try:
+        # Sayfanın HTML kodu değişene kadar bekleyin (dinamik bekleme)
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.page_source != initial_page_source
+        )
+
+        # Sayfanın güncellenmiş HTML kodunu alın
+        updated_page_source = driver.page_source
+    except TimeoutException:
+        # Timeout olursa sayfa güncellenmedi, başlangıçtaki HTML'yi kullan
+        updated_page_source = initial_page_source
+
+    # Aranan string'in güncellenmiş HTML içinde kaç kez geçtiğini sayın
+    count = updated_page_source.count(search_string)
 
     return count
+
