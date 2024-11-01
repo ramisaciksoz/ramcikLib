@@ -39,6 +39,12 @@ import pyautogui
 
 ##################### Whatsapp fonksiyonları ############################
 
+from multiprocessing import Lock
+
+# Modül seviyesinde bir Lock nesnesi oluşturun, bu nesnenin oluşturulma amacı bir whatsapp hesabı
+# iki tane tarayıcıda açmaya çalıştığın bozukluklar olması ve işlem yapılamaması
+whatsapp_lock = Lock()
+
 def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default: int = 1, headless: bool = False) -> webdriver:
     """
     Creates a WebDriver object using Chrome with profile.
@@ -106,62 +112,62 @@ def check_for_qr_code(driver: webdriver) -> bool:
         If the profile page (Chats screen) appears within that time, it returns False, indicating successful login.
         - If no QR code or profile screen is detected, the function returns False as a fallback.
     """
-
-    try:
-        # Web sayfasını aç
-        driver.get("https://web.whatsapp.com")
-        
-        # QR kodunu veya profil ekranını aynı anda bekle
-        WebDriverWait(driver, 100).until(
-            EC.any_of(
-                EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to capture the QR code')]")),
-                EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']")),
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Sohbetler']"))
-            )
-        )
-        
-        # QR kodu varsa true, profil ekranı varsa false döndür
-        qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Open WhatsApp on your phone')]")
-        if not qr_code_present:
-            qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")
-        
-        profile_present = driver.find_elements(By.CSS_SELECTOR, "div[aria-label='Chats']")
-        if not profile_present:
-            profile_present = driver.find_elements(By.CSS_SELECTOR, "div[aria-label='Sohbetler']")
-        
-        if qr_code_present:
-            print("QR kodu yükleniyor.")
-            # QR kodun yüklenmesini bekle
-            WebDriverWait(driver, 100).until(
-                EC.presence_of_element_located((By.XPATH, "//*[@aria-label='Scan me!']"))
-            )
-            print("QR kodu resmi yüklendi, 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleniyor. Eğer giriş yaparsan program devam edecek, yapmazsan da kapanacak.")
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        try:
+            # Web sayfasını aç
+            driver.get("https://web.whatsapp.com")
             
-            # QR kodu bulunca 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleme
-            profile_present = WebDriverWait(driver, 200).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']"))
+            # QR kodunu veya profil ekranını aynı anda bekle
+            WebDriverWait(driver, 100).until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to capture the QR code')]")),
+                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Sohbetler']"))
+                )
             )
-            if profile_present:
-                print("Profil açıldı.False döndürülüyor.")
-                return False
-            else:
-                print("Profil açılmadı. True döndürülüyor.")
-                return True
+            
+            # QR kodu varsa true, profil ekranı varsa false döndür
+            qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Open WhatsApp on your phone')]")
+            if not qr_code_present:
+                qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")
+            
+            profile_present = driver.find_elements(By.CSS_SELECTOR, "div[aria-label='Chats']")
+            if not profile_present:
+                profile_present = driver.find_elements(By.CSS_SELECTOR, "div[aria-label='Sohbetler']")
+            
+            if qr_code_present:
+                print("QR kodu yükleniyor.")
+                # QR kodun yüklenmesini bekle
+                WebDriverWait(driver, 100).until(
+                    EC.presence_of_element_located((By.XPATH, "//*[@aria-label='Scan me!']"))
+                )
+                print("QR kodu resmi yüklendi, 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleniyor. Eğer giriş yaparsan program devam edecek, yapmazsan da kapanacak.")
                 
+                # QR kodu bulunca 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleme
+                profile_present = WebDriverWait(driver, 200).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']"))
+                )
+                if profile_present:
+                    print("Profil açıldı.False döndürülüyor.")
+                    return False
+                else:
+                    print("Profil açılmadı. True döndürülüyor.")
+                    return True
+                    
 
-        elif profile_present:
-            print("Profil ekranı bulundu. False döndürülüyor.")
-            return False
-        
-        else:
-            print("Belirtilen elemanlar bulunamadı. True döndürülüyor.")
+            elif profile_present:
+                print("Profil ekranı bulundu. False döndürülüyor.")
+                return False
+            
+            else:
+                print("Belirtilen elemanlar bulunamadı. True döndürülüyor.")
+                return True
+
+        except Exception as e:
+            print(f"Hata oluştu: {e}")
+            # traceback.print_exc()  # Ayrıntılı hata mesajı
             return True
-
-    except Exception as e:
-        print(f"Hata oluştu: {e}")
-        # traceback.print_exc()  # Ayrıntılı hata mesajı
-        return True
 
 
 
@@ -196,37 +202,44 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
         driver = webdriver.Chrome()
         send_message_to_number("+905xxxxxxxxx", "Hello, this is a test message", driver)
     """
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        # kişi adına göre kişiyi bulma ve tıklama
+        try:
+            search_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+            )
+            search_box.click()
+            search_box.send_keys(phone_number)
+            search_box.send_keys(Keys.RETURN)
+            print("kişi bulundu ve açılıyor")
+        
+            # Mesaj kutusunun yüklenmesini bekleyin
+            msg_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+            print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
+            msg_box.send_keys(message + Keys.ENTER)
 
-    driver.get(f'https://web.whatsapp.com/send?phone={phone_number}')   
-    
-    try:
-        # Mesaj kutusunun yüklenmesini bekleyin
-        msg_box = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
-        )
-        print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
-        msg_box.send_keys(message + Keys.ENTER)
+            # Mesajın gönderilmesi için bekleniyor.
+            WebDriverWait(driver, 100).until(
+                EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+            )
 
-        # Mesajın gönderilmesi için bekleniyor.
-        WebDriverWait(driver, 100).until(
-            EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-        )
+            sent_success = WebDriverWait(driver, 100).until(
+                EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+            )
 
-        sent_success = WebDriverWait(driver, 100).until(
-            EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-        )
+            if sent_success:
+                print("Mesaj başarılı bir şekilde gönderildi.")
+            else:
+                print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
 
-        if sent_success:
-            print("Mesaj başarılı bir şekilde gönderildi.")
-        else:
-            print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
-
-
-        return True, None
-    except Exception as e:
-        print(f"Mesaj gönderilemedi: {e}")
-        traceback.print_exc()  # Ayrıntılı hata mesajı
-        return False,e
+            return True, None
+        except Exception as e:
+            print(f"Mesaj gönderilemedi: {e}")
+            traceback.print_exc()  # Ayrıntılı hata mesajı
+            return False,e
 
 
 def send_message_to_someone_or_group(someone_or_group_name: str, message: str, driver: webdriver) -> tuple[bool, Exception | None]:
@@ -274,47 +287,45 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
     - If the search box or message box cannot be located, or if the message fails to send 
       within the timeout, an exception will be raised and caught, with details printed to the console.
     """
-
-    # Grup adına göre grubu bulma ve tıklama
-    try:
-        search_box = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-        )
-        search_box.click()
-        search_box.send_keys(someone_or_group_name)
-        search_box.send_keys(Keys.RETURN)
-        print("Grup bulundu ve açılıyor")
-    except Exception as e:
-        print(f"search_box bulunamadı: {e}")
-        # traceback.print_exc()  # Ayrıntılı hata mesajı
     
-    try:
-        # Mesaj kutusunun yüklenmesini bekleyin
-        msg_box = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
-        )
-        print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
-        msg_box.send_keys(message + Keys.ENTER)
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        # Grup adına göre grubu bulma ve tıklama
+        try:
+            search_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+            )
+            search_box.click()
+            search_box.send_keys(someone_or_group_name)
+            search_box.send_keys(Keys.RETURN)
+            print("Grup bulundu ve açılıyor")
+        
+            # Mesaj kutusunun yüklenmesini bekleyin
+            msg_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+            print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
+            msg_box.send_keys(message + Keys.ENTER)
 
-        # Mesajın gönderilmesi için bekleniyor.
-        WebDriverWait(driver, 100).until(
-            EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-        )
+            # Mesajın gönderilmesi için bekleniyor.
+            WebDriverWait(driver, 100).until(
+                EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+            )
 
-        sent_success = WebDriverWait(driver, 100).until(
-            EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-        )
+            sent_success = WebDriverWait(driver, 100).until(
+                EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+            )
 
-        if sent_success:
-            print("Mesaj başarılı bir şekilde gönderildi.")
-        else:
-            print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+            if sent_success:
+                print("Mesaj başarılı bir şekilde gönderildi.")
+            else:
+                print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
 
-        return True, None
-    except Exception as e:
-        print(f"Mesaj gönderilemedi: {e}")
-        traceback.print_exc()  # Ayrıntılı hata mesajı
-        return False,e
+            return True, None
+        except Exception as e:
+            print(f"Mesaj gönderilemedi: {e}")
+            traceback.print_exc()  # Ayrıntılı hata mesajı
+            return False,e
 
 
 def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, driver: webdriver) -> tuple[bool, Exception | None]:
@@ -356,29 +367,24 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
         send_file_to_group("Family Group", r"C:/path/to/file.pdf", driver)
     """
 
-    # Grup adına göre grubu bulma ve tıklama
-    try:
-        search_box = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-        )
-        search_box.click()
-        search_box.send_keys(someone_or_group_name)
-        search_box.send_keys(Keys.RETURN)
-        print("Grup bulundu ve açılıyor")
-    except Exception as e:
-        print(f"search_box bulunamadı: {e}")
-        # traceback.print_exc()  # Ayrıntılı hata mesajı
-
-
-    try:
-        
-        # Mesaj kutusunun yüklenmesini bekleyin
-        msg_box = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
-        )
-        print("Mesaj kutusu bulundu.")
-        
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        # Grup adına göre grubu bulma ve tıklama
         try:
+            search_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+            )
+            search_box.click()
+            search_box.send_keys(someone_or_group_name)
+            search_box.send_keys(Keys.RETURN)
+            print("Grup bulundu ve açılıyor")
+        
+            # Mesaj kutusunun yüklenmesini bekleyin
+            msg_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+            print("Mesaj kutusu bulundu.")
+            
+            
             # Ataç simgesine tıkla
             attach_button = WebDriverWait(driver, 100).until(
                 EC.any_of(
@@ -387,51 +393,47 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
                 )
             )
             attach_button.click()
+            
+            # Dosya yükleme elemanını bul ve dosyayı yükle
+            file_input = WebDriverWait(driver, 50).until(
+                EC.presence_of_element_located((By.XPATH, "//input[@accept='image/*,video/mp4,video/3gpp,video/quicktime']"))
+            )
+
+            if os.path.isabs(file_path):
+                absolute_file_path = file_path  # If it's already absolute, use it as is
+            else:
+                absolute_file_path = os.path.abspath(file_path)  # If it's relative, convert it to an absolute path
+
+            file_input.send_keys(absolute_file_path)  # Dosya dosyasını yükle
+            print("file_path bulundu.")
+
+            # Gönder butonuna tıkla
+            send_button = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, "//span[@data-icon='send']"))
+            )
+            send_button.click()
+
+            # Mesajın gönderilmesi için bekleniyor.
+            WebDriverWait(driver, 100).until(
+                EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+            )
+
+            sent_success = WebDriverWait(driver, 100).until(
+                EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+            )
+
+            if sent_success:
+                print("Dosya başarılı bir şekilde gönderildi.")
+            else:
+                print("Dosya hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+            
+            return True, None
+
         except Exception as e:
-            print(f"attach_button bulunamadı: {e}")
-            # traceback.print_exc()  # Ayrıntılı hata mesajı
-
-
-        
-        # Dosya yükleme elemanını bul ve dosyayı yükle
-        file_input = WebDriverWait(driver, 50).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@accept='image/*,video/mp4,video/3gpp,video/quicktime']"))
-        )
-
-        if os.path.isabs(file_path):
-            absolute_file_path = file_path  # If it's already absolute, use it as is
-        else:
-            absolute_file_path = os.path.abspath(file_path)  # If it's relative, convert it to an absolute path
-
-        file_input.send_keys(absolute_file_path)  # Dosya dosyasını yükle
-        print("file_path bulundu.")
-
-        # Gönder butonuna tıkla
-        send_button = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, "//span[@data-icon='send']"))
-        )
-        send_button.click()
-
-        # Mesajın gönderilmesi için bekleniyor.
-        WebDriverWait(driver, 100).until(
-            EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-        )
-
-        sent_success = WebDriverWait(driver, 100).until(
-            EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-        )
-
-        if sent_success:
-            print("Dosya başarılı bir şekilde gönderildi.")
-        else:
-            print("Dosya hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
-
-        return True, None
-
-    except Exception as e:
-        print(f"Dosya gönderilemedi: {e}")
-        traceback.print_exc()  # Ayrıntılı hata mesajı
-        return False,e
+            print(f"Dosya gönderilemedi: {e}")
+            traceback.print_exc()  # Ayrıntılı hata mesajı
+            return False,e
 
 def notify_phone_number(phone_number: str, message: str, chrome_profile_path: str = "", headless: bool = False):
 
@@ -493,20 +495,21 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
         raise ValueError("Profil yolu sağlanmadı ve ortam değişkenleri ayarlanmadı. ikisinden biri yapılmalı.")
 
     driver = create_webdriver_with_profile(chrome_profile_path, headless = headless)
-
-    # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
-    qr_exists = check_for_qr_code(driver)
-    if qr_exists:
-        send_email("WhatsApp Login Alert","QR kod tarama işlemi gerekiyor. Lütfen programı yenileyin.")  # QR kod istendiğinde email gönder
     
-    # Yoksa wpweb'deki benim mesajlarıma erişmiş demektir.
-    else:
-        check_sending, e = send_message_to_number(phone_number, message, driver)
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
+        qr_exists = check_for_qr_code(driver)
+        if qr_exists:
+            send_email("WhatsApp Login Alert","QR kod tarama işlemi gerekiyor. Lütfen programı yenileyin.")  # QR kod istendiğinde email gönder
+        
+        # Yoksa wpweb'deki benim mesajlarıma erişmiş demektir.
+        else:
+            check_sending, e = send_message_to_number(phone_number, message, driver)
 
-        #bir önceki satır false ise yani gönderilemediyse alttaki satırı çalıştır.
-        if not check_sending:
-            
-            send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",e)
+            #bir önceki satır false ise yani gönderilemediyse alttaki satırı çalıştır.
+            if not check_sending:
+                
+                send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",e)
 
 
 
@@ -540,70 +543,70 @@ def check_whatsapp_online_status(
         driver = webdriver.Chrome()
         check_whatsapp_online_status('+905551234567', driver, wait_time=30, retry_attempts=5)
     """
-
-    status_info = {"online": False, "status": "offline", "error": None, "exception_occurred": False}
-    
-    # Format the URL to open the chat with the provided phone number
-    try:
-        driver.get(f"https://web.whatsapp.com/send?phone={phone_number}")
-    except InvalidArgumentException:
-        status_info["error"] = "Invalid phone number format. Please use international format (e.g., +905551234567)."
-        return status_info
-
-    for attempt in range(retry_attempts):
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        status_info = {"online": False, "status": "offline", "error": None, "exception_occurred": False}
+        
+        # Format the URL to open the chat with the provided phone number
         try:
-            print(f"Checking online status for {phone_number}, attempt {attempt + 1}/{retry_attempts}...")
+            driver.get(f"https://web.whatsapp.com/send?phone={phone_number}")
+        except InvalidArgumentException:
+            status_info["error"] = "Invalid phone number format. Please use international format (e.g., +905551234567)."
+            return status_info
 
-            # Wait for the chat to load and check for the user's online or typing status
-            status_element = WebDriverWait(driver, wait_time).until(
-                EC.visibility_of_element_located((
-                    By.XPATH, f"//div[@id='main']//span[@title='online' or @title='çevrimiçi' or contains(@title, 'typing') or contains(@title, 'yazıyor')]"
-                ))
-            )
+        for attempt in range(retry_attempts):
+            try:
+                print(f"Checking online status for {phone_number}, attempt {attempt + 1}/{retry_attempts}...")
 
-            if status_element:
-                status = status_element.get_attribute("title").lower()
+                # Wait for the chat to load and check for the user's online or typing status
+                status_element = WebDriverWait(driver, wait_time).until(
+                    EC.visibility_of_element_located((
+                        By.XPATH, f"//div[@id='main']//span[@title='online' or @title='çevrimiçi' or contains(@title, 'typing') or contains(@title, 'yazıyor')]"
+                    ))
+                )
 
-                if 'typing' in status or 'yazıyor' in status:
-                    status_info["online"] = True
-                    status_info["status"] = "typing..."
-                    print(f"{phone_number} is typing...")
-                elif 'online' in status or 'çevrimiçi' in status:
-                    status_info["online"] = True
-                    status_info["status"] = "online"
-                    print(f"{phone_number} is online.")
-                break  # Exit the retry loop as status has been found
+                if status_element:
+                    status = status_element.get_attribute("title").lower()
 
-        except TimeoutException:
-            # Retry on timeout
-            if attempt + 1 < retry_attempts:
-                print(f"Timeout while waiting for {phone_number}'s status. Retrying after {delay_between_retries} seconds...")
-                time.sleep(delay_between_retries)
-            else:
-                print(f"Timeout exceeded. Assuming {phone_number} is offline.")
-                status_info["online"] = False
-                status_info["status"] = "offline"
-                if take_screenshot_on_error:
-                    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    driver.save_screenshot(f"whatsapp_status_error_{phone_number}_{current_time}.png")
-                break
+                    if 'typing' in status or 'yazıyor' in status:
+                        status_info["online"] = True
+                        status_info["status"] = "typing..."
+                        print(f"{phone_number} is typing...")
+                    elif 'online' in status or 'çevrimiçi' in status:
+                        status_info["online"] = True
+                        status_info["status"] = "online"
+                        print(f"{phone_number} is online.")
+                    break  # Exit the retry loop as status has been found
 
-        except Exception as e:
-            # Handle any other exceptions, including connectivity issues
-            status_info["error"] = str(e)
-            status_info["exception_occurred"] = True  # Indicator that an exception occurred
-            print(f"Error checking status for {phone_number}: {e}")
-            if attempt + 1 < retry_attempts:
-                print(f"Retrying after {delay_between_retries} seconds...")
-                time.sleep(delay_between_retries)
-            else:
-                print(f"Failed to check status after {retry_attempts} attempts.")
-                if take_screenshot_on_error:
-                    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    driver.save_screenshot(f"whatsapp_status_error_{phone_number}_{current_time}.png")
-                break
+            except TimeoutException:
+                # Retry on timeout
+                if attempt + 1 < retry_attempts:
+                    print(f"Timeout while waiting for {phone_number}'s status. Retrying after {delay_between_retries} seconds...")
+                    time.sleep(delay_between_retries)
+                else:
+                    print(f"Timeout exceeded. Assuming {phone_number} is offline.")
+                    status_info["online"] = False
+                    status_info["status"] = "offline"
+                    if take_screenshot_on_error:
+                        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                        driver.save_screenshot(f"whatsapp_status_error_{phone_number}_{current_time}.png")
+                    break
 
-    return status_info
+            except Exception as e:
+                # Handle any other exceptions, including connectivity issues
+                status_info["error"] = str(e)
+                status_info["exception_occurred"] = True  # Indicator that an exception occurred
+                print(f"Error checking status for {phone_number}: {e}")
+                if attempt + 1 < retry_attempts:
+                    print(f"Retrying after {delay_between_retries} seconds...")
+                    time.sleep(delay_between_retries)
+                else:
+                    print(f"Failed to check status after {retry_attempts} attempts.")
+                    if take_screenshot_on_error:
+                        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                        driver.save_screenshot(f"whatsapp_status_error_{phone_number}_{current_time}.png")
+                    break
+
+        return status_info
 
 
 
@@ -640,41 +643,55 @@ def get_last_message(phone_number: str, driver: webdriver) -> str | None:
         Exception: If the chat fails to load within the given time (60 seconds).
     """
     
-    driver.get(f'https://web.whatsapp.com/send?phone={phone_number}')
-    
-    try:
-        # Wait until the chat interface has loaded by checking for incoming message elements
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
-        )
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
-        )
-        print("Chat loaded successfully.")
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        try:
+            # kişi adına göre kişiyi bulma ve tıklama
+            search_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+            )
+            search_box.click()
+            search_box.send_keys(phone_number)
+            search_box.send_keys(Keys.RETURN)
+            print("Grup bulundu ve açılıyor")
         
-        # Locate all incoming message elements within the chat
-        message_elements = driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") and contains(@class, "focusable-list-item")]//div[contains(@class, "_akbu")]/span')
-        
-        # Filter out empty messages
-        valid_messages = [element.text for element in message_elements if element.text.strip()]
+            # Mesaj kutusunun yüklenmesini bekleyin
+            msg_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+            print("Mesaj kutusu bulundu.")
 
-        if valid_messages:
-            # Print all non-empty messages
-            for index, message in enumerate(valid_messages):
-                print(f"Message {index}: {message}")
+            # Wait until the chat interface has loaded by checking for incoming message elements
+            WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
+            )
+            WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
+            )
+            print("Chat loaded successfully.")
             
-            # Get the last non-empty message
-            last_message_text = valid_messages[-1]
-            print("Last received message:", last_message_text)
-        else:
-            print("No messages received from the other party.")
+            # Locate all incoming message elements within the chat
+            message_elements = driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") and contains(@class, "focusable-list-item")]//div[contains(@class, "_akbu")]/span')
+            
+            # Filter out empty messages
+            valid_messages = [element.text for element in message_elements if element.text.strip()]
+
+            if valid_messages:
+                # Print all non-empty messages
+                for index, message in enumerate(valid_messages):
+                    print(f"Message {index}: {message}")
+                
+                # Get the last non-empty message
+                last_message_text = valid_messages[-1]
+                print("Last received message:", last_message_text)
+            else:
+                print("No messages received from the other party.")
+                raise Exception("No messages received from the other party.")
+
+        except Exception as e:
+            print(f"Error loading chat: {e}")
             last_message_text = None
 
-    except Exception as e:
-        print(f"Error loading chat: {e}")
-        last_message_text = None
-
-    return str(last_message_text)
+        return str(last_message_text)
 
 
 def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]:
@@ -711,35 +728,51 @@ def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]
         Exception: If the chat fails to load within the given time limit (60 seconds).
     """
 
-    driver.get(f'https://web.whatsapp.com/send?phone={phone_number}')
     
-    try:
-        # Wait until both incoming and outgoing message elements are present
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
-        )
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
-        )
-        print("Chat fully loaded successfully.")
+    with whatsapp_lock:  # Kilidi kullanarak işlem yap
+        try:
+            # kişi adına göre kişiyi bulma ve tıklama
+            search_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+            )
+            search_box.click()
+            search_box.send_keys(phone_number)
+            search_box.send_keys(Keys.RETURN)
+            print("Grup bulundu ve açılıyor")
         
-        # Locate all message elements (both sent and received messages) within the chat
-        message_elements = driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") or contains(@class, "message-out")]//div[contains(@class, "_akbu")]/span')
-        
-        # Filter out empty messages
-        valid_messages = [element.text for element in message_elements if element.text.strip()]
+            # Mesaj kutusunun yüklenmesini bekleyin
+            msg_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+            print("Mesaj kutusu bulundu.")
+            
+            # Wait until both incoming and outgoing message elements are present
+            WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
+            )
+            WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
+            )
+            print("Chat fully loaded successfully.")
+            
+            # Locate all message elements (both sent and received messages) within the chat
+            message_elements = driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") or contains(@class, "message-out")]//div[contains(@class, "_akbu")]/span')
+            
+            # Filter out empty messages
+            valid_messages = [element.text for element in message_elements if element.text.strip()]
 
-        if valid_messages:
-            print(f"Retrieved {len(valid_messages)} messages.")
-            print(valid_messages)
-        else:
-            print("No messages were found in the chat.")
+            if valid_messages:
+                print(f"Retrieved {len(valid_messages)} messages.")
+                print(valid_messages)
+            else:
+                print("No messages were found in the chat.")
+                raise Exception("No messages were found in the chat.")
+            
+        except Exception as e:
+            print(f"Error loading chat: {e}")
+            valid_messages = []
 
-    except Exception as e:
-        print(f"Error loading chat: {e}")
-        valid_messages = []
-
-    return valid_messages
+        return valid_messages
 
 ##################### Mail fonksiyonları ############################
 
