@@ -1,5 +1,3 @@
-import subprocess
-import sys
 from selenium import webdriver  # WebDriver ile tarayıcı otomasyonu için gerekli kütüphane
 from selenium.webdriver.common.by import By  # HTML elementlerini bulmak için kullanılan konum belirleyici
 from selenium.webdriver.common.keys import Keys  # Klavye tuşlarını simüle etmek için kullanılır
@@ -13,11 +11,8 @@ import smtplib  # E-posta gönderme işlemleri için kullanılan kütüphane
 from email.mime.text import MIMEText  # E-posta içeriğini oluşturmak için kullanılır
 from email.mime.multipart import MIMEMultipart  # Birden fazla parçadan oluşan e-posta mesajları oluşturmak için kullanılır
 import traceback
-import re  # Düzenli ifadelerle metin analizi yapmak için kullanılır
 from telethon import TelegramClient, sync  # sync modülü senkron çalışmayı sağlar
 from telethon.errors import PeerIdInvalidError
-import imaplib  # IMAP kütüphanesini içe aktarır, Gmail ile e-posta alma işlemleri için kullanılır
-import email  # E-posta mesajlarını işlemek için kullanılır
 from email.header import decode_header
 import requests
 from PIL import Image, ImageDraw
@@ -496,20 +491,20 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
 
     driver = create_webdriver_with_profile(chrome_profile_path, headless = headless)
     
-    with whatsapp_lock:  # Kilidi kullanarak işlem yap
-        # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
-        qr_exists = check_for_qr_code(driver)
-        if qr_exists:
-            send_email("WhatsApp Login Alert","QR kod tarama işlemi gerekiyor. Lütfen programı yenileyin.")  # QR kod istendiğinde email gönder
-        
-        # Yoksa wpweb'deki benim mesajlarıma erişmiş demektir.
-        else:
-            check_sending, e = send_message_to_number(phone_number, message, driver)
+    # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
+    qr_exists = check_for_qr_code(driver)
+    if qr_exists:
+        send_email("WhatsApp Login Alert","QR kod tarama işlemi gerekiyor. Lütfen programı yenileyin.")  # QR kod istendiğinde email gönder
+    
+    # Yoksa wpweb'deki benim mesajlarıma erişmiş demektir.
+    else:
+        check_sending, e = send_message_to_number(phone_number, message, driver)
+        driver.quit()  # Driver'ı kapat
 
-            #bir önceki satır false ise yani gönderilemediyse alttaki satırı çalıştır.
-            if not check_sending:
-                
-                send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",e)
+        #bir önceki satır false ise yani gönderilemediyse alttaki satırı çalıştır.
+        if not check_sending:
+            
+            send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",e)
 
 
 

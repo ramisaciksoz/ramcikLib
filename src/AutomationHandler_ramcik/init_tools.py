@@ -2,6 +2,16 @@ import subprocess
 import sys
 import os
 from dotenv import dotenv_values
+from pathlib import Path
+
+# Determine folder path based on the operating system
+folder_path = ""
+if os.name == 'nt':
+    folder_path =  "C:/OmnesCore"
+if os.name == 'posix':
+    folder_path = Path('/OmnesCore')
+file_path = os.path.join(folder_path, "myenvfile.env")
+
 
 def oc_install_deps():
     """
@@ -9,9 +19,9 @@ def oc_install_deps():
     It iterates through a list of required packages, attempting to install each one.
     If a package is already installed, it will be skipped.
     Errors encountered during installation will be caught and printed, allowing the 
-    function to continue trying to install the remaining packages.
+    function to continue trying to install the remaining packages. Compatible with 
+    different operating systems.
     """
-    
     # List of packages to install
     packages = [
         "selenium",  # Web browser automation
@@ -22,14 +32,6 @@ def oc_install_deps():
         "numpy",  # Numerical Python
         "pyautogui",  # GUI automation
         "requests",  # HTTP library for web requests
-        "python-dotenv",  # For environment variable management
-        "smtplib",  # Standard email sending library
-        "email",  # Email message handling (already in standard library, but added for clarity)
-        "imaplib",  # IMAP email retrieval (built-in to Python, included for clarity)
-        "traceback",  # Error traceback handling (built-in)
-        "re",  # Regular expressions (built-in)
-        "ssl",  # Secure Socket Layer (built-in)
-        "cv2",  # OpenCV for image processing (opencv-python)
     ]
     
     # Try installing each package
@@ -49,25 +51,20 @@ def oc_install_deps():
 
 def oc_create_myenvfile():
     """
-    Generates or updates a `.env` file named `myenvfile.env` with required environment variables.
-    
-    If the file already exists, it checks if any required environment variables are missing. 
-    If so, it adds the missing variables with placeholder values and prints a message indicating 
-    which variables were added.
-    
-    If the folder or file does not exist, it creates them.
-    
-    The file will always be checked or created at `C:/OmnesCore/myenvfile.env`.
-    
+    Generates or updates an environment file named `myenvfile.env` at a specified path based on the operating system.
+
+    The function ensures that the `.env` file exists in the `OmnesCore` folder, which is located at:
+        - `C:/OmnesCore/myenvfile.env` on Windows
+        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+        
+    If the folder or file does not exist, it creates them. If the file already exists, it checks for any missing required 
+    environment variables, adds placeholders for missing variables, and indicates which variables were added.
+
     Example:
     --------
     oc_create_myenvfile()
     """
-    
-    # Path where the myenvfile.env will be created or updated
-    folder_path = "C:/OmnesCore"
-    file_path = os.path.join(folder_path, "myenvfile.env")
-    
+
     # Dummy environment variables with descriptive placeholder values
     required_env_vars = {
         "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "C:/path/to/primary/profile",
@@ -121,7 +118,11 @@ def oc_create_myenvfile():
 
 def oc_use_myenvfile():
     """
-    uses (it is set temporarily, not into the system environment variables) environment variables from the `.env` file located at `C:/OmnesCore/myenvfile.env`.
+    uses (it is set temporarily, not into the system environment variables) environment variables from the `.env` file.
+
+    The function temporarily sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
+        - `C:/OmnesCore/myenvfile.env` on Windows
+        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
 
     Returns:
     --------
@@ -141,7 +142,7 @@ def oc_use_myenvfile():
     """
 
     # Directly use the file path as a string
-    env_path = "C:/OmnesCore/myenvfile.env"
+    env_path = file_path
     
     # Check if the file exists using os.path.isfile
     if not os.path.isfile(env_path):
@@ -158,15 +159,16 @@ def oc_set_env_from_myenvfile():
     Reads environment variables from a fixed `.env` file at `C:/OmnesCore/myenvfile.env`
     and sets them permanently on Windows using the `setx` command.
     
+    The function permanently sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
+        - `C:/OmnesCore/myenvfile.env` on Windows
+        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+    
     This function uses the fixed file path and does not require a parameter.
     
     Example:
     --------
     set_env_from_file_permanently()
     """
-    
-    # Fixed path to the myenvfile.env file
-    file_path = "C:/OmnesCore/myenvfile.env"
     
     # Load the environment variables from the .env file
     env_vars = dotenv_values(file_path)
@@ -187,14 +189,15 @@ def oc_del_env():
     """
     Reads environment variables from a fixed `.env` file at `C:/OmnesCore/myenvfile.env`
     and deletes (unsets) them permanently on Windows by setting them to an empty value.
+
+    The function permanently sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
+        - `C:/OmnesCore/myenvfile.env` on Windows
+        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
     
     Example:
     --------
     delete_env_from_file()
     """
-    
-    # Fixed path to the myenvfile.env file
-    file_path = "C:/OmnesCore/myenvfile.env"
     
     # Load the environment variables from the .env file
     env_vars = dotenv_values(file_path)
