@@ -516,7 +516,9 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
         2. Selects the appropriate Chrome profile directory based on whether the phone number 
            belongs to the user or another person:
             - If it's the user's phone number, uses the 'CHROME_SECONDARY_WHATSAPP_PROFILE_PATH' 
-              environment variable to send the message from another WhatsApp account.
+              environment variable to send the message from another WhatsApp account. if there 
+              is no 'CHROME_SECONDARY_WHATSAPP_PROFILE_PATH', it uses 
+              'CHROME_PRIMARY_WHATSAPP_PROFILE_PATH'.
             - Otherwise, uses the 'CHROME_PRIMARY_WHATSAPP_PROFILE_PATH' environment variable.
         3. If the 'chrome_profile_path' argument is provided, it overrides the default profile 
            selection.
@@ -556,6 +558,8 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
         if phone_number == os.getenv('MY_NUMBER'): # Benim telefon numaramsa
             # Chrome profil dizini yolu klasörün içinde olucak şekilde ayarlanır kendiğinden.
             chrome_profile_path = os.getenv('CHROME_SECONDARY_WHATSAPP_PROFILE_PATH')
+            if chrome_profile_path == "":
+                chrome_profile_path = os.getenv('CHROME_PRIMARY_WHATSAPP_PROFILE_PATH')
         else:
             # Chrome profil dizini yolu klasörün içinde olucak şekilde ayarlanır kendiğinden.
             chrome_profile_path = os.getenv('CHROME_PRIMARY_WHATSAPP_PROFILE_PATH')

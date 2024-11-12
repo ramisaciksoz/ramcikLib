@@ -55,7 +55,7 @@ def oc_create_myenvfile():
 
     The function ensures that the `.env` file exists in the `OmnesCore` folder, which is located at:
         - `C:/OmnesCore/myenvfile.env` on Windows
-        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+        - `os.getenv("HOME")+/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
         
     If the folder or file does not exist, it creates them. If the file already exists, it checks for any missing required 
     environment variables, adds placeholders for missing variables, and indicates which variables were added.
@@ -68,20 +68,34 @@ def oc_create_myenvfile():
     """
 
     # Dummy environment variables with descriptive placeholder values
-    required_env_vars = {
-        "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "C:/path/to/primary/profile",
-        "CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "C:/path/to/secondary/profile",
-        "MY_GMAIL": "example@gmail.com",
-        "MY_GOOGLE_APPLICATION_CREDENTIALS": "C:/path/to/google/credentials.json",
-        "MY_NUMBER": "+1234567890",
-        "MY_TELEGRAM_API_HASH": "your-telegram-api-hash",
-        "MY_TELEGRAM_API_ID": "your-telegram-api-id",
-        "MY_TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
-        "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
-        "SENDER_EMAIL": "example_sender@gmail.com",
-        "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
-    }
-    
+    if os.name == 'nt':
+        required_env_vars = {
+            "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "C:/path/to/primary/profile",
+            "CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "",
+            "MY_GMAIL": "example@gmail.com",
+            "MY_GOOGLE_APPLICATION_CREDENTIALS": "C:/path/to/google/credentials.json",
+            "MY_NUMBER": "+1234567890",
+            "MY_TELEGRAM_API_HASH": "your-telegram-api-hash",
+            "MY_TELEGRAM_API_ID": "your-telegram-api-id",
+            "MY_TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
+            "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
+            "SENDER_EMAIL": "example_sender@gmail.com",
+            "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
+        }
+    if os.name == 'posix':
+        required_env_vars = {
+            "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": os.getenv("HOME")+"/OmnesCore/ChromeProfile/primary/profile",
+            "CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "",
+            "MY_GMAIL": "example@gmail.com",
+            "MY_GOOGLE_APPLICATION_CREDENTIALS": "/path/to/google/credentials.json",
+            "MY_NUMBER": "+1234567890",
+            "MY_TELEGRAM_API_HASH": "your-telegram-api-hash",
+            "MY_TELEGRAM_API_ID": "your-telegram-api-id",
+            "MY_TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
+            "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
+            "SENDER_EMAIL": "example_sender@gmail.com",
+            "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
+        }
     # Ensure the folder exists, create if not
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -124,7 +138,7 @@ def oc_use_myenvfile():
 
     The function temporarily sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
         - `C:/OmnesCore/myenvfile.env` on Windows
-        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+        - `os.getenv("HOME")+/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
     --------
     - ### Returns:
     --------
@@ -165,7 +179,7 @@ def oc_set_env_from_myenvfile():
     
     The function permanently sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
         - `C:/OmnesCore/myenvfile.env` on Windows
-        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+        - `os.getenv("HOME")+/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
     
     This function uses the fixed file path and does not require a parameter.
     
@@ -202,7 +216,7 @@ def oc_del_env():
 
     The function permanently sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
         - `C:/OmnesCore/myenvfile.env` on Windows
-        - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+        - `os.getenv("HOME")+/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
     
     - ### Example:
     ```python
