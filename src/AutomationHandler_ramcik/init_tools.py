@@ -61,8 +61,10 @@ def oc_create_myenvfile():
     environment variables, adds placeholders for missing variables, and indicates which variables were added.
 
     Example:
-    --------
+
+    ```python
     oc_create_myenvfile()
+    ```
     """
 
     # Dummy environment variables with descriptive placeholder values
@@ -75,7 +77,7 @@ def oc_create_myenvfile():
         "MY_TELEGRAM_API_HASH": "your-telegram-api-hash",
         "MY_TELEGRAM_API_ID": "your-telegram-api-id",
         "MY_TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
-        "MY_TELEGRAM_CHAT_ID": "your-telegram-chat-id",
+        "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
         "SENDER_EMAIL": "example_sender@gmail.com",
         "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
     }
@@ -123,22 +125,24 @@ def oc_use_myenvfile():
     The function temporarily sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
         - `C:/OmnesCore/myenvfile.env` on Windows
         - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
-
-    Returns:
     --------
-    dict:
-        A dictionary containing the environment variables and their values.
-    
-    Raises:
+    - ### Returns:
+    --------
+        dict:
+            A dictionary containing the environment variables and their values.
+    --------
+    - ### Raises:
     -------
-    FileNotFoundError:
-        If the `.env` file does not exist at the specified path.
-
-    Example:
+        FileNotFoundError:
+            If the `.env` file does not exist at the specified path.
     --------
+    - ### Example:
+    --------
+    ```python
     env_vars = load_env_variables()
     my_gmail = env_vars.get('MY_GMAIL') # or my_gmail = os.getenv('MY_GMAIL')
     print(f"My Gmail: {my_gmail}")
+    ```
     """
 
     # Directly use the file path as a string
@@ -165,9 +169,11 @@ def oc_set_env_from_myenvfile():
     
     This function uses the fixed file path and does not require a parameter.
     
-    Example:
-    --------
-    set_env_from_file_permanently()
+
+    - ### Example:
+    ```python
+    init_tools.set_env_from_file_permanently()
+    ```
     """
     
     # Load the environment variables from the .env file
@@ -177,7 +183,11 @@ def oc_set_env_from_myenvfile():
     for key, value in env_vars.items():
         if value is not None:
             # Use setx to permanently set the environment variable on Windows
-            os.system(f'setx {key} "{value}"')
+            if os.name == 'nt':
+                os.system(f'setx {key} "{value}"')
+            # For POSIX systems, add unset command to .bashrc
+            if os.name == 'posix':
+                os.system("echo 'export " + key + "=\"" + value + "\"' >> ~/.bashrc")
             print(f"Set {key} = {value} permanently on the system(user variables).")
         else:
             print(f"Skipping {key} because it has no value.")
@@ -194,9 +204,10 @@ def oc_del_env():
         - `C:/OmnesCore/myenvfile.env` on Windows
         - `/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
     
-    Example:
-    --------
+    - ### Example:
+    ```python
     delete_env_from_file()
+    ```
     """
     
     # Load the environment variables from the .env file
@@ -204,8 +215,12 @@ def oc_del_env():
     
     # Loop through each environment variable and unset it
     for key in env_vars.keys():
-        # Use setx to permanently set the environment variable to an empty value
-        os.system(f'setx {key} ""')
+        # Use setx to permanently set the environment variable to an empty value on Windows
+        if os.name == 'nt':
+            os.system(f'setx {key} ""')
+        # For POSIX systems, add unset command to .bashrc
+        if os.name == 'posix':
+            os.system("echo 'export " + key + "=\"\"' >> ~/.bashrc")
         print(f"Deleted (unset) {key} permanently on the system(user variables).")
     
     print("All environment variables from the file have been deleted.")

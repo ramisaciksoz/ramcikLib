@@ -42,23 +42,31 @@ whatsapp_lock = Lock()
 
 def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default: int = 1, headless: bool = False) -> webdriver:
     """
-    Creates a WebDriver object using Chrome with profile.
+    Creates a WebDriver object using Chrome with a specified user profile.
 
-    Parameters:
-    - chrome_profile_path (str): The file path to the Chrome user profile to be used.
-    - profile_default (int): The default profile to use. 1 for primary, 2 for secondary. 
-      If a path is not provided, it fetches the path from the environment variables.
-    - headless (bool): Whether to run Chrome in headless mode. Defaults to False.
+    - ### Parameters:
 
-    Environment Variables:
-    - CHROME_PRIMARY_WHATSAPP_PROFILE_PATH: Path for the primary WhatsApp Chrome profile.
-    - CHROME_SECONDARY_WHATSAPP_PROFILE_PATH: Path for the secondary WhatsApp Chrome profile.
+        - chrome_profile_path (str): The file path to the Chrome user profile to be used.
+        
+        - If `chrome_profile_path` is not provided, it fetches the path from environment variables.
+        profile_default (int): The default profile to use.
+            - 1 for primary
+            - 2 for secondary
+            
+        - headless (bool): Whether to run Chrome in headless mode. Defaults to False.
 
-    Returns:
-    - WebDriver: A WebDriver object initialized with the specified Chrome profile.
-    
-    Raises:
-    - ValueError: If neither `chrome_profile_path` nor environment variables are set.
+    - ### Environment Variables:
+
+        - CHROME_PRIMARY_WHATSAPP_PROFILE_PATH: Path for the primary WhatsApp Chrome profile.
+        - CHROME_SECONDARY_WHATSAPP_PROFILE_PATH: Path for the secondary WhatsApp Chrome profile.
+
+    - ### Returns:
+
+        WebDriver: A WebDriver object initialized with the specified Chrome profile.
+
+    - ### Raises:
+
+        ValueError: If neither `chrome_profile_path` nor environment variables are set.
     """
 
     if chrome_profile_path == "" and profile_default == 1:
@@ -98,24 +106,33 @@ def check_for_qr_code(driver: webdriver) -> bool:
     This function opens the WhatsApp Web page using the provided Selenium WebDriver instance.
     It waits for either a QR code prompt or the Chats screen to appear.
     
-    Returns:
-        - True: If a QR code is present, indicating the user needs to scan it to log in, or if no valid elements are found.
-        - False: If the user is already logged in (the Chats screen is displayed).
+    - ### Parameters:
+
+        driver (Webdriver): A Selenium Webdriver instance for interacting with WhatsApp Web.
+
+    - ### Returns:
+
+        bool: - True if QR code is present (needs scan) or no elements found.
+              - False if already logged in (Chats screen).
+
+    - ### Notes:
     
-    Notes:
-        - If a QR code is found, the function waits up to 200 seconds for the user to scan the code and log in. 
-        If the profile page (Chats screen) appears within that time, it returns False, indicating successful login.
+        - If a QR code is found, the function waits up to 200 seconds for the user to scan the code 
+          and log in. If the profile page (Chats screen) appears within that time, it returns False, 
+          indicating successful login.
+        
         - If no QR code or profile screen is detected, the function returns False as a fallback.
-    """
+        """
+    
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         try:
             # Web sayfasını aç
             driver.get("https://web.whatsapp.com")
             
             # QR kodunu veya profil ekranını aynı anda bekle
-            WebDriverWait(driver, 100).until(
+            WebDriverWait(driver, 300).until(
                 EC.any_of(
-                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to capture the QR code')]")),
+                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                     EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']")),
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Sohbetler']"))
@@ -135,7 +152,7 @@ def check_for_qr_code(driver: webdriver) -> bool:
                 print("QR kodu yükleniyor.")
                 # QR kodun yüklenmesini bekle
                 WebDriverWait(driver, 100).until(
-                    EC.presence_of_element_located((By.XPATH, "//*[@aria-label='Scan me!']"))
+                    EC.presence_of_element_located((By.XPATH, "//*[@aria-label='Scan this QR code to link a device!']"))
                 )
                 print("QR kodu resmi yüklendi, 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleniyor. Eğer giriş yaparsan program devam edecek, yapmazsan da kapanacak.")
                 
@@ -170,37 +187,53 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
     """
     Sends a WhatsApp message to a specified phone number using Selenium WebDriver.
 
-    Args:
-        phone_number (str): The phone number to which the message should be sent. 
-                            The format should include the country code without any leading '+'.
-                            Example: '+905xxxxxxxxx' for a Turkish phone number.
-        message (str): The text message to send.
-        driver (selenium.webdriver): An instance of Selenium WebDriver with an active session of WhatsApp Web.
+    - ### Parameters:
 
-    Returns:
+        - phone_number (str): 
+            The phone number to which the message should be sent. The format should include the 
+            country code without any leading '+' or with any leading '+'. 
+            Example: '905xxxxxxxxx' OR '+905xxxxxxxxx' for a Turkish phone number.
+        
+        - message (str): 
+            The text message to send.
+        
+        - driver (selenium.webdriver): 
+            An instance of Selenium WebDriver with an active session of WhatsApp Web.
+
+    - ### Returns:
+
         tuple:
             - (bool): True if the message was successfully sent, False otherwise.
             - (Exception or None): Returns the exception object if an error occurs, otherwise None.
 
-    Workflow:
+    - ### Workflow:
+
         1. Opens WhatsApp Web with the provided phone number using the driver.
         2. Waits for the message input box to load.
-        3. Sends the provided message into the message box and simulates pressing the Enter key.
-        4. Waits for the message to be sent, verifying it by checking for the disappearance of the "sending" icon.
-        5. Returns True if the message is sent successfully; otherwise, catches any exception, logs it, and returns False.
+        3. Sends the provided message into the message box and simulates pressing the Enter key.        
+        4. Waits for the message to be sent, verifying it by checking for the disappearance of the 
+           "sending" icon.
+        5. Returns True if the message is sent successfully; otherwise, catches any exception, logs 
+           it, and returns False.
         
-    Exceptions:
-        Any exceptions that occur during the process (e.g., loading WhatsApp, finding elements, sending message)
-        are caught and printed with the full traceback for easier debugging.
+    - ### Exceptions:
+
+        Any exceptions that occur during the process (e.g., loading WhatsApp, finding elements, 
+        sending message) are caught and printed with the full traceback for easier debugging.
     
-    Example:
-        driver = webdriver.Chrome()
+    - ### Example:
+    
+    ```python
+        send_message_to_number("905xxxxxxxxx", "Hello, this is a test message", driver)
+        OR
         send_message_to_number("+905xxxxxxxxx", "Hello, this is a test message", driver)
+    ``` 
     """
+
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         # kişi adına göre kişiyi bulma ve tıklama
         try:
-            search_box = WebDriverWait(driver, 100).until(
+            search_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
             )
             search_box.click()
@@ -209,18 +242,18 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
             print("kişi bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
-            msg_box = WebDriverWait(driver, 100).until(
+            msg_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
             msg_box.send_keys(message + Keys.ENTER)
 
             # Mesajın gönderilmesi için bekleniyor.
-            WebDriverWait(driver, 100).until(
+            WebDriverWait(driver, 300).until(
                 EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            sent_success = WebDriverWait(driver, 100).until(
+            sent_success = WebDriverWait(driver, 300).until(
                 EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
@@ -241,52 +274,56 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
     """
     Sends a message to a specific person or WhatsApp group using Selenium WebDriver.
 
-    Parameters:
-    -----------
-    someone_or_group_name : str
-        The name of the contact or WhatsApp group to which the message will be sent.
+    - ### Parameters:
     
-    message : str
-        The message that you want to send to the contact or group.
-
-    driver : WebDriver
-        An instance of the Selenium WebDriver, which is controlling the browser 
-        that is logged into WhatsApp Web.
-
-    Returns:
-    --------
-    (tuple): (True/False, exception or None)
-        - True if sent successfully, False if failed.
-        - Exception object if an error occurred, otherwise None.
-
-    Functionality:
-    --------------
-    1. This function first searches for the WhatsApp contact or group by its name using the search box.
-    2. Once the contact or group is found and opened, it waits for the message input box to load.
-    3. The message is then typed into the input box and sent.
-    4. After sending the message, the function waits for confirmation that the message 
-       has been successfully sent (i.e., the "waiting to send" clock icon disappears).
-    5. If the message is sent successfully, the function returns True. Otherwise, it returns 
-       False and provides the relevant error message.
-
-    Notes:
-    ------
-    - The function uses WebDriverWait to ensure that elements are loaded before interacting with them.
-    - The search box and message box are located using XPaths.
-    - The function handles exceptions and prints informative error messages in case of failure.
-    - The function is able to send messages to both individuals and groups.
+        - someone_or_group_name (str): 
+            The name of the contact or WhatsApp group to which the message will be sent.
     
+        - message (str):
+            The message that you want to send to the contact or group.
 
-    Exceptions:
-    -----------
-    - If the search box or message box cannot be located, or if the message fails to send 
-      within the timeout, an exception will be raised and caught, with details printed to the console.
+        - driver (WebDriver): 
+            An instance of the Selenium WebDriver, which is controlling the browser that is logged 
+            into WhatsApp Web.
+
+    - ### Returns:
+
+        (tuple): (True/False, exception or None)
+            - True if sent successfully, False if failed.
+            - Exception object if an error occurred, otherwise None.
+
+    - ### Functionality:
+
+        1. This function first searches for the WhatsApp contact or group by its name using the 
+           search box.
+        2. Once the contact or group is found and opened, it waits for the message input box to 
+           load.
+        3. The message is then typed into the input box and sent.
+        4. After sending the message, the function waits for confirmation that the message 
+           has been successfully sent (i.e., the "waiting to send" clock icon disappears).
+        5. If the message is sent successfully, the function returns True. Otherwise, it returns 
+           False and provides the relevant error message.
+
+    - ### Notes:
+
+        - The function uses WebDriverWait to ensure that elements are loaded before interacting 
+          with them.
+        - The search box and message box are located using XPaths.
+        - The function handles exceptions and prints informative error messages in case of failure.
+        - The function is able to send messages to both individuals and groups.
+        
+
+    - ### Exceptions:
+
+        - If the search box or message box cannot be located, or if the message fails to send 
+          within the timeout, an exception will be raised and caught, with details printed to the 
+          console.
     """
     
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         # Grup adına göre grubu bulma ve tıklama
         try:
-            search_box = WebDriverWait(driver, 100).until(
+            search_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
             )
             search_box.click()
@@ -295,18 +332,18 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
             print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
-            msg_box = WebDriverWait(driver, 100).until(
+            msg_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
             msg_box.send_keys(message + Keys.ENTER)
 
             # Mesajın gönderilmesi için bekleniyor.
-            WebDriverWait(driver, 100).until(
+            WebDriverWait(driver, 300).until(
                 EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            sent_success = WebDriverWait(driver, 100).until(
+            sent_success = WebDriverWait(driver, 300).until(
                 EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
@@ -327,37 +364,53 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
     """
     Sends a file (e.g., image, video, PDF, document) to a specified WhatsApp group or **individual contact** using Selenium WebDriver.
 
-    Args:
-        group_name (str): The name of the WhatsApp group or **individual contact** where the file will be sent. 
-                          The group name or contact name should match exactly as it appears in WhatsApp.
-                          The function can send files to both groups and individual contacts whose numbers are saved with their full names.
-        file_path (str): The local file path of the file to be sent. 
-                         Ensure the file exists at the specified path.
-        driver (selenium.webdriver): An active instance of Selenium WebDriver, with a logged-in session of WhatsApp Web.
+    - ### Parameters:
 
-    Returns:
+        - group_name (str): 
+            The name of the WhatsApp group or **individual contact** where the file will be sent. 
+            The group name or contact name should match exactly as it appears in WhatsApp. The 
+            function can send files to both groups and individual contacts whose numbers are saved 
+            with their full names.
+
+        - file_path (str): 
+            The local file path of the file to be sent. Ensure the file exists at the specified 
+            path.
+            
+        - driver (selenium.webdriver): 
+            An active instance of Selenium WebDriver, with a logged-in session of WhatsApp Web.
+
+    - ### Returns:
+
         tuple:
             - (bool): True if the file was successfully sent, False otherwise.
-            - (Exception or None): If an error occurs, it returns the exception object. Otherwise, it returns None.
+            - (Exception or None): If an error occurs, it returns the exception object. 
+              Otherwise, it returns None.
 
-    Workflow:
+    - ### Workflow:
+
         1. The function first waits for the WhatsApp search box to load, 
            then searches for the group or contact by typing the provided `group_name`.
-        2. After locating the group or contact, it waits for the message input box to appear and load.
-        3. The function locates the attachment (paperclip) button and clicks it to open the file attachment options.
-        4. Once the attachment options appear, the function finds the file input element and uploads the file from `file_path`.
-        5. After successfully uploading the file, it clicks the send button to send the file in the group or contact chat.
-        6. The function waits for the file to be sent by checking for the disappearance of the "sending" icon.
-        7. If the file is sent successfully, it returns True, otherwise it catches any exceptions, logs them, and returns False.
+        2. After locating the group or contact, it waits for the message input box to appear and 
+           load.
+        3. The function locates the attachment (paperclip) button and clicks it to open the file 
+           attachment options.
+        4. Once the attachment options appear, the function finds the file input element and 
+           uploads the file from `file_path`.
+        5. After successfully uploading the file, it clicks the send button to send the file in the 
+           group or contact chat.
+        6. The function waits for the file to be sent by checking for the disappearance of the 
+           "sending" icon.
+        7. If the file is sent successfully, it returns True, otherwise it catches any exceptions,
+           logs them, and returns False.
 
-    Exceptions:
-        The function captures and logs exceptions at each critical step (finding elements, uploading, and sending).
-        The detailed traceback is printed to help with debugging if any errors occur during execution.
+    - ### Exceptions:
 
-    Example:
-        driver = webdriver.Chrome()
-        driver.get('https://web.whatsapp.com')
-        input("Please scan the QR code to log into WhatsApp Web, then press Enter...")
+        - The function captures and logs exceptions at each critical step (finding elements, 
+        uploading, and sending).
+        - The detailed traceback is printed to help with debugging if any errors occur during 
+        execution.
+
+    - ### Example:
 
         send_file_to_group("Family Group", r"C:/path/to/file.pdf", driver)
     """
@@ -365,7 +418,7 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         # Grup adına göre grubu bulma ve tıklama
         try:
-            search_box = WebDriverWait(driver, 100).until(
+            search_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
             )
             search_box.click()
@@ -374,7 +427,7 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
             print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
-            msg_box = WebDriverWait(driver, 100).until(
+            msg_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu.")
@@ -390,7 +443,7 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
             attach_button.click()
             
             # Dosya yükleme elemanını bul ve dosyayı yükle
-            file_input = WebDriverWait(driver, 50).until(
+            file_input = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//input[@accept='image/*,video/mp4,video/3gpp,video/quicktime']"))
             )
 
@@ -403,17 +456,17 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
             print("file_path bulundu.")
 
             # Gönder butonuna tıkla
-            send_button = WebDriverWait(driver, 100).until(
+            send_button = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//span[@data-icon='send']"))
             )
             send_button.click()
 
             # Mesajın gönderilmesi için bekleniyor.
-            WebDriverWait(driver, 100).until(
+            WebDriverWait(driver, 300).until(
                 EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            sent_success = WebDriverWait(driver, 100).until(
+            sent_success = WebDriverWait(driver, 300).until(
                 EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
@@ -441,53 +494,74 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
     For other phone numbers, it uses the primary WhatsApp profile defined by the 'CHROME_PRIMARY_WHATSAPP_PROFILE_PATH' environment variable.
     If a QR code is required to log in, the function sends an email notification without attempting to send the message.
 
-    Args:
-        phone_number (str): The phone number to which the message should be sent.
-        message (str): The content of the message to be sent.
-        chrome_profile_path (str, optional): The file path to the Chrome user profile to be used. 
-                                             If not provided, the function will use environment variables for profile paths.
-        headless (bool, optional): If True, runs the WebDriver in headless mode (without a GUI). 
-                                   Defaults to False.
+    - ### Parameters:
 
-    Behavior:
-        1. Checks if the provided phone number is the user's own number by comparing it with the environment variable 'MY_NUMBER'.
-        2. Selects the appropriate Chrome profile directory based on whether the phone number belongs to the user or another person:
-            - If it's the user's phone number, uses the 'CHROME_SECONDARY_WHATSAPP_PROFILE_PATH' environment variable to send the message from another WhatsApp account.
+        - phone_number (str): 
+            The phone number to which the message should be sent.
+
+        - message (str): 
+            The content of the message to be sent.
+
+        - chrome_profile_path (str, optional): 
+            The file path to the Chrome user profile to be used. If not provided, the function will 
+            use environment variables for profile paths.
+        
+        - headless (bool, optional): 
+            If True, runs the WebDriver in headless mode (without a GUI). Defaults to False.
+
+    - ### Behavior:
+
+        1. Checks if the provided phone number is the user's own number by comparing it with the 
+           environment variable 'MY_NUMBER'.
+        2. Selects the appropriate Chrome profile directory based on whether the phone number 
+           belongs to the user or another person:
+            - If it's the user's phone number, uses the 'CHROME_SECONDARY_WHATSAPP_PROFILE_PATH' 
+              environment variable to send the message from another WhatsApp account.
             - Otherwise, uses the 'CHROME_PRIMARY_WHATSAPP_PROFILE_PATH' environment variable.
-        3. If the 'chrome_profile_path' argument is provided, it overrides the default profile selection.
-        4. Creates a WebDriver instance with the selected Chrome profile, optionally running in headless mode if specified.
-        5. Checks for the presence of a QR code on WhatsApp Web, which indicates that a login is required.
-            - If a QR code is detected, the function sends an email notification with the subject "WhatsApp Login Alert" and stops further execution.
-        6. If no QR code is detected, it attempts to send the message using the `send_message_to_number` function.
+        3. If the 'chrome_profile_path' argument is provided, it overrides the default profile 
+           selection.
+        4. Creates a WebDriver instance with the selected Chrome profile, optionally running in 
+           headless mode if specified.
+        5. Checks for the presence of a QR code on WhatsApp Web, which indicates that a login is 
+           required.
+            - If a QR code is detected, the function sends an email notification with the subject 
+              "WhatsApp Login Alert" and stops further execution.
+        6. If no QR code is detected, it attempts to send the message using the 
+           `send_message_to_number` function.
             - If the message is successfully sent, the function ends.
-            - If the message cannot be sent, the function sends an email notification with details about the failure.
+            - If the message cannot be sent, the function sends an email notification with details 
+              about the failure.
 
-    Raises:
+    - ### Raises:
+
         Sends an email if:
             - A QR code is present, signaling that manual login is required.
             - The message could not be sent due to an error.
 
-    Dependencies:
+    - ### Dependencies:
+
         - os.getenv: To fetch environment variables like phone number and Chrome profile paths.
         - create_webdriver_with_profile: To create a WebDriver instance with a specific Chrome profile.
         - check_for_qr_code: To check if a QR code is present on WhatsApp Web.
         - send_message_to_number: To send a WhatsApp message to the specified number.
         - send_email: To send an email alert in case of errors.
 
-    Example usage:
+    - ### Example usage:
+
         notify_phone_number("+905xxxxxxxxx", "Hello, this is a test message.")
         notify_phone_number("+905xxxxxxxxx", "This is a headless test message.", headless=True)
     """
-
-    if phone_number == os.getenv('MY_NUMBER'): # Benim telefon numaramsa
-        # Chrome profil dizini yolu klasörün içinde olucak şekilde ayarlanır kendiğinden.
-        chrome_profile_path = os.getenv('CHROME_SECONDARY_WHATSAPP_PROFILE_PATH')
-    else:
-        # Chrome profil dizini yolu klasörün içinde olucak şekilde ayarlanır kendiğinden.
-        chrome_profile_path = os.getenv('CHROME_PRIMARY_WHATSAPP_PROFILE_PATH')
     
-    if chrome_profile_path == "" or chrome_profile_path is None:
-        raise ValueError("Profil yolu sağlanmadı ve ortam değişkenleri ayarlanmadı. ikisinden biri yapılmalı.")
+    if chrome_profile_path == "":
+        if phone_number == os.getenv('MY_NUMBER'): # Benim telefon numaramsa
+            # Chrome profil dizini yolu klasörün içinde olucak şekilde ayarlanır kendiğinden.
+            chrome_profile_path = os.getenv('CHROME_SECONDARY_WHATSAPP_PROFILE_PATH')
+        else:
+            # Chrome profil dizini yolu klasörün içinde olucak şekilde ayarlanır kendiğinden.
+            chrome_profile_path = os.getenv('CHROME_PRIMARY_WHATSAPP_PROFILE_PATH')
+        
+        if chrome_profile_path == "":
+            raise ValueError("Profil yolu sağlanmadı ve ortam değişkenleri ayarlanmadı. ikisinden biri yapılmalı.")
 
     driver = create_webdriver_with_profile(chrome_profile_path, headless = headless)
     
@@ -503,8 +577,7 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
 
         #bir önceki satır false ise yani gönderilemediyse alttaki satırı çalıştır.
         if not check_sending:
-            
-            send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",e)
+            send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",str(e))
 
 
 
@@ -519,25 +592,40 @@ def check_whatsapp_online_status(
     """
     Check the online status of a WhatsApp user using Selenium WebDriver.
 
-    Args:
-        phone_number (str): The phone number of the WhatsApp user in international format (e.g., '+905551234567').
-        driver (selenium.webdriver): An instance of Selenium WebDriver used to control the browser and interact with WhatsApp Web.
-        wait_time (int, optional): Time in seconds to wait for the online status to appear. Default is 20 seconds.
-        retry_attempts (int, optional): Number of attempts to retry checking the online status. Default is 3 retries.
-        delay_between_retries (int, optional): Delay in seconds between retries. Default is 3 seconds.
-        take_screenshot_on_error (bool, optional): If True, takes a screenshot when an error occurs. Default is False.
+    - ### Args:
 
-    Returns:
+        - phone_number (str):
+            The phone number of the WhatsApp user in international format (e.g., '+905551234567').
+
+        - driver (selenium.webdriver): 
+            An instance of Selenium WebDriver used to control the browser and interact with 
+            WhatsApp Web.
+        
+        - wait_time (int, optional): 
+            Time in seconds to wait for the online status to appear. Default is 20 seconds.
+        
+        - retry_attempts (int, optional): 
+            Number of attempts to retry checking the online status. Default is 3 retries.
+        
+        - delay_between_retries (int, optional):
+            Delay in seconds between retries. Default is 3 seconds.
+        
+        - take_screenshot_on_error (bool, optional): 
+            If True, takes a screenshot when an error occurs. Default is False.
+
+    - ### Returns:
+
         dict: Returns a dictionary with detailed status information:
               - 'online': True/False, if the user is currently online.
               - 'status': "online", "typing...", "offline", "last seen", "unavailable".
               - 'error': If an exception occurred, the error message will be logged here.
               - 'exception_occurred': True/False, indicator if an exception was raised during execution.
 
-    Example usage:
-        driver = webdriver.Chrome()
+    - ### Example:
+
         check_whatsapp_online_status('+905551234567', driver, wait_time=30, retry_attempts=5)
     """
+
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         status_info = {"online": False, "status": "offline", "error": None, "exception_occurred": False}
         
@@ -614,34 +702,43 @@ def get_last_message(phone_number: str, driver: webdriver) -> str | None:
     (if any) from the other party. If the chat fails to load or no messages are present,
     it handles these scenarios gracefully.
 
-    Args:
-        phone_number (str): The phone number of the contact in international format (e.g., "+905551234567").
-        driver (selenium.webdriver.WebDriver): The Selenium WebDriver instance controlling the browser.
+    - ### Args:
 
-    Returns:
+        - phone_number (str): 
+            The phone number of the contact in international format (e.g., "+905551234567").
+
+        - driver (selenium.webdriver.WebDriver): 
+            The Selenium WebDriver instance controlling the browser.
+
+    - ### Returns:
+
         str: The last received message from the other party, or None if no messages are found
              or the chat fails to load.
 
-    Steps:
-    1. Navigate to WhatsApp Web using the provided phone number.
-    2. Wait until the chat interface is fully loaded (e.g., by detecting a specific message element).
-    3. Retrieve all non-empty received messages from the chat.
-    4. Return the last received message, or print a message if none are found.
+    - ### Steps:
 
-    Example:
+        1. Navigate to WhatsApp Web using the provided phone number.
+        2. Wait until the chat interface is fully loaded (e.g., by detecting a specific message 
+           element).
+        3. Retrieve all non-empty received messages from the chat.
+        4. Return the last received message, or print a message if none are found.
+
+    - ### Example:
+
         driver = webdriver.Chrome()
         phone_number = "+905551234567"
         last_message = get_last_message(phone_number, driver)
         print(f"Last message received: {last_message}")
 
-    Raises:
+    - ### Raises:
+
         Exception: If the chat fails to load within the given time (60 seconds).
     """
     
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         try:
             # kişi adına göre kişiyi bulma ve tıklama
-            search_box = WebDriverWait(driver, 100).until(
+            search_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
             )
             search_box.click()
@@ -650,16 +747,16 @@ def get_last_message(phone_number: str, driver: webdriver) -> str | None:
             print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
-            msg_box = WebDriverWait(driver, 100).until(
+            msg_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu.")
 
             # Wait until the chat interface has loaded by checking for incoming message elements
-            WebDriverWait(driver, 60).until(
+            WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
             )
-            WebDriverWait(driver, 60).until(
+            WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
             )
             print("Chat loaded successfully.")
@@ -699,27 +796,37 @@ def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]
     The function specifically waits for both incoming ("message-in") and outgoing ("message-out") messages to be loaded, 
     ensuring that the page has fully loaded before attempting to retrieve the chat history. 
 
-    Args:
-        phone_number (str): The phone number of the contact in international format (e.g., "+905551234567").
-        driver (selenium.webdriver.WebDriver): The Selenium WebDriver instance controlling the browser.
+    - ### Args:
 
-    Returns:
-        list: A list of all sent and received messages from the chat. If no messages are found or there is an error, 
-              the function returns an empty list.
+        - phone_number (str): 
+            The phone number of the contact in international format (e.g., "+905551234567").
+        
+        - driver (selenium.webdriver.WebDriver): 
+            The Selenium WebDriver instance controlling the browser.
 
-    Example:
+    - ### Returns:
+
+        list: A list of all sent and received messages from the chat. If no messages are found or 
+        there is an error, the function returns an empty list.
+
+    - ### Example:
+
         driver = webdriver.Chrome()
         phone_number = "+905551234567"
         chat_history = get_whatsapp_chat_history(phone_number, driver)
         print(f"Chat history: {chat_history}")
 
-    Process:
-    1. The function navigates to the WhatsApp Web page for the provided phone number.
-    2. It waits until the chat interface is loaded by checking for both incoming and outgoing message elements.
-    3. Once the chat is fully loaded, it retrieves all messages from the chat.
-    4. If messages are found, it returns the list of messages. Otherwise, it returns an empty list.
+    - ### Process:
 
-    Raises:
+        1. The function navigates to the WhatsApp Web page for the provided phone number.
+        2. It waits until the chat interface is loaded by checking for both incoming and outgoing 
+           message elements.
+        3. Once the chat is fully loaded, it retrieves all messages from the chat.
+        4. If messages are found, it returns the list of messages. Otherwise, it returns an empty 
+           list.
+
+    - ### Raises:
+
         Exception: If the chat fails to load within the given time limit (60 seconds).
     """
 
@@ -727,7 +834,7 @@ def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         try:
             # kişi adına göre kişiyi bulma ve tıklama
-            search_box = WebDriverWait(driver, 100).until(
+            search_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
             )
             search_box.click()
@@ -736,16 +843,16 @@ def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]
             print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
-            msg_box = WebDriverWait(driver, 100).until(
+            msg_box = WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu.")
             
             # Wait until both incoming and outgoing message elements are present
-            WebDriverWait(driver, 60).until(
+            WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
             )
-            WebDriverWait(driver, 60).until(
+            WebDriverWait(driver, 300).until(
                 EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
             )
             print("Chat fully loaded successfully.")
@@ -773,66 +880,72 @@ def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]
 
 
 
-def send_email(Subject: str, text: str, sender_email: str = "", app_password: str = "", receiver_email: str = "") -> bool:
+def send_email(Subject: str, body: str, receiver_email: str = "me", sender_email: str = "", app_password: str = "") -> bool:
     """
     Sends an email using Gmail's SMTP server with the option to specify sender and receiver email addresses
     and an application-specific password. If any of these are not provided, the function will attempt to
     retrieve them from environment variables.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     Subject : str
         The subject of the email.
-    
-    text : str
+
+    body : str
         The body of the email in plain text.
-    
-    sender_email : str, optional (default = "")
-        The email address of the sender. If not provided, the function will use the 'SENDER_EMAIL'
-        environment variable.
-    
-    app_password : str, optional (default = "")
+
+    receiver_email (str, optional (default = "me")): 
+        The recipient's email address. Defaults to "me," meaning the function will use the 'MY_GMAIL' 
+        environment variable by default. If not provided.
+
+    sender_email : str, optional
+        The email address of the sender. If not provided, the function will use the 'SENDER_EMAIL' environment variable.
+        Default is "".
+
+    app_password : str, optional
         The application-specific password for the sender's Gmail account. If not provided, the function will use the 
         'SENDER_EMAIL_APP_PASSWORD' environment variable. This is required due to Gmail's security settings.
-    
-    receiver_email : str, optional (default = "")
-        The recipient's email address. If not provided, the function will use the 'MY_GMAIL' environment variable.
+        Default is "".
 
-    Behavior:
-    ---------
-    - If the `sender_email`, `app_password`, or `receiver_email` parameters are not provided, the function will look for these values
-      in the environment variables:
+    Behavior
+    --------
+    - If `sender_email`, `app_password`, or `receiver_email` are not provided, the function will look for these values
+    in the environment variables:
         - `SENDER_EMAIL` for the sender's email address
         - `SENDER_EMAIL_APP_PASSWORD` for the Gmail application password
         - `MY_GMAIL` for the recipient's email address
-    - If any of these environment variables or parameters are missing, the function will print an error message and return `False`.
-    - The function creates a plain text email message using the provided `Subject` and `text`.
+    - If any of these environment variables or parameters are missing, an error message is printed, and the function returns `False`.
+    - The function creates a plain text email message using the provided `Subject` and `body`.
     - The email is sent using Gmail's SMTP server over SSL (port 465).
-    - If the email is sent successfully, a message indicating success is printed.
-    - If an error occurs during sending, an error message along with the full traceback is printed.
+    - If sent successfully, a success message is printed.
+    - If an error occurs, an error message and the traceback are printed.
 
-    Returns:
-    --------
-    bool : Returns `True` if the email is sent successfully, `False` otherwise.
+    Returns
+    -------
+    bool
+        Returns `True` if the email is sent successfully, `False` otherwise.
 
-    Example:
-    --------
+    Example
+    -------
+    ```python
     send_email(
         Subject="Test Email",
-        text="This is a test email.",
+        body="This is a test email.",
         sender_email="youremail@gmail.com",
         app_password="yourapppassword",
         receiver_email="recipientemail@gmail.com"
     )
-    
-    Notes:
-    ------
-    - Gmail requires the use of an application-specific password if two-factor authentication (2FA) is enabled.
-      You can generate this password from your Google Account settings.
-    - Make sure to set the necessary environment variables if you don't provide the parameters directly.
+    ```
+
+    Notes
+    -----
+    - Gmail requires an application-specific password if two-factor authentication (2FA) is enabled.
+    You can generate this password from your Google Account settings.
+    - Ensure necessary environment variables are set if parameters are not directly provided.
     - The function currently sends only plain text emails.
     """
-    # text = Email metni
+
+    # body = Email metni
     if not sender_email:
         sender_email = os.getenv('SENDER_EMAIL') # Gönderici email adresi
         if not sender_email:
@@ -845,7 +958,7 @@ def send_email(Subject: str, text: str, sender_email: str = "", app_password: st
             print("""Çevresel değişkenlerde 'SENDER_EMAIL_APP_PASSWORD' bulunamadı veya 'app_password' sağlanmadı. Lütfen birini temin edin.""")
             return False
     
-    if not receiver_email:
+    if  receiver_email == "me":
         receiver_email = os.getenv('MY_GMAIL') # Gmail uygulama şifresi
         if not receiver_email:
             print("""Çevresel değişkenlerde 'MY_GMAIL' bulunamadı veya 'receiver_email' sağlanmadı. Lütfen birini temin edin.""")
@@ -853,8 +966,8 @@ def send_email(Subject: str, text: str, sender_email: str = "", app_password: st
     
     try:
         # Check if error_data is not a string and convert it to a string if necessary
-        if not isinstance(text, str):
-            text = str(text)
+        if not isinstance(body, str):
+            body = str(body)
     except Exception as conversion_error:
         # Raise an exception if conversion to string fails
         raise ValueError(f"Failed to convert error_data to a string: {conversion_error}")
@@ -865,7 +978,7 @@ def send_email(Subject: str, text: str, sender_email: str = "", app_password: st
     message["Subject"] = Subject
     message["From"] = sender_email
     message["To"] = receiver_email
-    part = MIMEText(text, "plain", 'utf-8')
+    part = MIMEText(body, "plain", 'utf-8')
     message.attach(part)
     
     # Email gönderme işlemi
@@ -881,7 +994,7 @@ def send_email(Subject: str, text: str, sender_email: str = "", app_password: st
         return False
 
 
-def send_email_with_attachments(subject: str, text: str, attachment_files: list, receiver_email: str, sender_email: str = "", app_password: str = "") -> bool: 
+def send_email_with_attachments(subject: str, body: str, attachment_files: list, receiver_email: str = "me", sender_email: str = "", app_password: str = "") -> bool: 
     """
     Sends an email with optional file attachments using Gmail's SMTP server.
 
@@ -892,9 +1005,11 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: list,
 
     Args:
         subject (str): The subject of the email.
-        text (str): The body content of the email in plain text.
+        body (str): The body content of the email in plain text.
         attachment_files (list): A list of file paths for the attachments to be sent.
-        receiver_email (str): The email address of the recipient.
+        receiver_email (str, optional (default = "me")): The recipient's email address. Defaults to "me,"
+                                                         meaning the function will use the 'MY_GMAIL' environment
+                                                         variable by default. If not provided.
         sender_email (str, optional): The sender's email address. Defaults to an empty string. 
                                       If not provided, it will use the 'SENDER_EMAIL' environment variable.
         app_password (str, optional): The app-specific password for the sender's email. 
@@ -909,14 +1024,16 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: list,
         smtplib.SMTPException: If an error occurs during the SMTP transaction.
     
     Example:
+    ```python
         send_email_with_attachments(
             subject="Test Email",
-            text="This is a test email.",
+            body="This is a test email.",
             attachment_files=["/path/to/attachment1.txt", "/path/to/attachment2.pdf"],
             receiver_email="example@example.com",
             sender_email="your-email@gmail.com",
             app_password="your-app-password"
         )
+    ```
     
     Notes:
         - Ensure that you have created an app-specific password for your Gmail account, as 
@@ -938,6 +1055,12 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: list,
             print("""Çevresel değişkenlerde 'SENDER_EMAIL_APP_PASSWORD' bulunamadı veya 'app_password' sağlanmadı. Lütfen birini temin edin.""")
             return False
 
+    if  receiver_email == "me":
+        receiver_email = os.getenv('MY_GMAIL') # Gmail uygulama şifresi
+        if not receiver_email:
+            print("""Çevresel değişkenlerde 'MY_GMAIL' bulunamadı veya 'receiver_email' sağlanmadı. Lütfen birini temin edin.""")
+            return False
+        
     # Gmail SMTP sunucusu ve portu
     smtp_server = 'smtp.gmail.com'
     smtp_port = 587
@@ -951,15 +1074,15 @@ def send_email_with_attachments(subject: str, text: str, attachment_files: list,
 
     try:
         # Check if error_data is not a string and convert it to a string if necessary
-        if not isinstance(text, str):
-            text = str(text)
+        if not isinstance(body, str):
+            body = str(body)
     except Exception as conversion_error:
         # Raise an exception if conversion to string fails
         raise ValueError(f"Failed to convert error_data to a string: {conversion_error}")
     
 
     # Mesaj gövdesini ekle
-    msg.attach(MIMEText(text, 'plain', 'utf-8'))  # E-posta gövdesini düz metin olarak ekle
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))  # E-posta gövdesini düz metin olarak ekle
     try:
         # Dosya eklerini ekle
         for file_path in attachment_files:
@@ -1023,17 +1146,34 @@ def telegram_send_message(
     """
     A function that sends a message via Telegram. It works with either the recipient's username (recipient) or phone number (recipient_phone).
     
-    Args:
-    message (str): The message to be sent.
-    recipient (str): The Telegram username of the recipient to whom the message will be sent.
-    recipient_phone (str): The phone number of the recipient to whom the message will be sent.
-    my_phone_number (str): Your own phone number. If not provided to the function, it will be retrieved from environment variables.
-    api_id (str): Telegram API ID. If not provided to the function, it will be retrieved from environment variables.
-    api_hash (str): Telegram API Hash. If not provided to the function, it will be retrieved from environment variables.
-    
-    Returns:
-    bool: Returns True if the message was successfully sent, otherwise returns False.
+    - ### Args:
+
+        - message (str): 
+            The message to be sent.
+
+        - recipient (str): 
+            The Telegram username of the recipient to whom the message will be sent.
+
+        - recipient_phone (str): 
+            The phone number of the recipient to whom the message will be sent.
+
+        - my_phone_number (str): 
+            Your own phone number. If not provided to the function, it will be retrieved from 
+            environment variables.
+
+        - api_id (str): 
+            Telegram API ID. If not provided to the function, it will be retrieved from 
+            environment variables.
+
+        - api_hash (str): 
+            Telegram API Hash. If not provided to the function, it will be retrieved from 
+            environment variables.
+        
+    - ### Returns:
+
+        bool: Returns True if the message was successfully sent, otherwise returns False.
     """
+
     # Eğer fonksiyona API ID, API Hash veya telefon numarası verilmediyse çevresel değişkenlerden alıyoruz.
     if not api_id:
         api_id = os.getenv('MY_TELEGRAM_API_ID')
@@ -1093,29 +1233,40 @@ def send_telegram_bot_message_to_self(message: str, bot_token: str = None, chat_
     This function utilizes the Telegram Bot API to send a text message to the chat ID 
     (typically your own user ID) using the bot's API token.
 
-    Args:
-    message (str): The message content to be sent via Telegram.
-    bot_token (str, optional): The API token of your Telegram bot. If not provided, it will attempt 
-                               to use the 'MY_TELEGRAM_BOT_TOKEN' environment variable.
-    chat_id (str, optional): The Telegram chat ID to send the message to. If not provided, it will 
-                             attempt to use the 'MY_TELEGRAM_CHAT_ID' environment variable.
+    - ### Args:
 
-    Returns:
-    bool: True if the message was sent successfully, False otherwise.
+        - message (str): 
+            The message content to be sent via Telegram.
 
-    Usage:
-    1. You need to create a bot through Telegram's BotFather and get the bot token.
-    2. Optionally, set up environment variables 'MY_TELEGRAM_BOT_TOKEN' and 'MY_TELEGRAM_CHAT_ID'.
-    3. Call this function with a message to send.
+        - bot_token (str, optional): 
+            The API token of your Telegram bot. If not provided, it will attempt to use the 
+            'MY_TELEGRAM_BOT_TOKEN' environment variable.
+        
+        - chat_id (str, optional): 
+            The Telegram chat ID to send the message to. If not provided, it will attempt to use 
+            the 'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME' environment variable.
 
-    Example:
-    send_telegram_bot_message_to_self("Hello, this is a test message!")
+    - ### Returns:
 
-    Error Handling:
-    - If the bot_token or chat_id is not provided, and the relevant environment variables 
-      are not set, the function will return False with an informative message.
-    - In case of a request error (e.g., network issues), the function will catch the exception 
-      and return False, printing the error message.
+        bool: True if the message was sent successfully, False otherwise.
+
+    - ### Usage:
+
+        1. You need to create a bot through Telegram's BotFather and get the bot token.
+        2. Optionally, set up environment variables 'MY_TELEGRAM_BOT_TOKEN' and 
+           'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME'.
+        3. Call this function with a message to send.
+
+    - ### Example:
+    
+        send_telegram_bot_message_to_self("Hello, this is a test message!")
+
+    - ### Error Handling:
+
+        - If the bot_token or chat_id is not provided, and the relevant environment variables 
+        are not set, the function will return False with an informative message.
+        - In case of a request error (e.g., network issues), the function will catch the exception 
+        and return False, printing the error message.
     """
 
     if not bot_token:
@@ -1125,9 +1276,9 @@ def send_telegram_bot_message_to_self(message: str, bot_token: str = None, chat_
             return False
     
     if not chat_id:
-        chat_id = os.getenv('MY_TELEGRAM_CHAT_ID')
+        chat_id = os.getenv('MY_TELEGRAM_BOT_CHAT_ID_WITH_ME')
         if not chat_id:
-            print("""Çevresel değişkenlerde 'MY_TELEGRAM_CHAT_ID' bulunamadı veya 'chat_id' sağlanmadı. Lütfen birini temin edin.""")
+            print("""Çevresel değişkenlerde 'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME' bulunamadı veya 'chat_id' sağlanmadı. Lütfen birini temin edin.""")
             return False
 
 
@@ -1163,23 +1314,27 @@ def capture_full_page_screenshot(driver: webdriver, full_screenshot_path: str = 
     and saves it to the specified file path. If no path is provided, a default file name 
     with a timestamp is generated, and the screenshot is saved in the current working directory.
 
-    Parameters:
-        driver: Selenium WebDriver instance
+    - ### Parameters:
+
+        - driver: Selenium WebDriver instance
             The Selenium WebDriver instance controlling the browser.
             
-        full_screenshot_path: str, optional
-            The full file path where the screenshot should be saved, including the directory and file name.
-            If a file name without an extension is provided, '.png' will be automatically appended.
-            If this parameter is not provided, the screenshot will be saved in the current directory
-            with a default file name that includes a timestamp.
+        - full_screenshot_path: str, optional
+            The full file path where the screenshot should be saved, including the directory and 
+            file name. If a file name without an extension is provided, '.png' will be 
+            automatically appended. If this parameter is not provided, the screenshot will be 
+            saved in the current directory with a default file name that includes a timestamp.
     
-    Returns:
+    - ### Returns:
+
         str: The full path to the saved screenshot file.
 
-    Raises:
+    - ### Raises:
+
         OSError: If there is an issue creating the directory or saving the file.
 
-    Examples:
+    - ### Examples:
+
         # Example 1: Save screenshot with a custom file name and path
         capture_full_page_screenshot(driver, "C:/Screenshots/my_screenshot.png")
 
@@ -1191,7 +1346,7 @@ def capture_full_page_screenshot(driver: webdriver, full_screenshot_path: str = 
     """
 
     # Ensure the page is fully loaded
-    WebDriverWait(driver, 30).until(lambda d: driver.execute_script('return document.readyState') == 'complete')
+    WebDriverWait(driver, 100).until(lambda d: driver.execute_script('return document.readyState') == 'complete')
 
     # Get the current timestamp and create a unique screenshot filename if full path is not provided
     if not full_screenshot_path:
@@ -1270,20 +1425,28 @@ def record_screen(duration: int | float, output_name: str):
     """
     Records the screen for a specified duration and saves it as a video file.
 
-    Args:
-        duration (int or float): The duration in seconds for which the screen will be recorded.
-        output_name (str): The base name for the output video file.
+    - ### Args:
 
-    Details:
+        - duration (int or float): 
+            The duration in seconds for which the screen will be recorded.
+
+        - output_name (str): 
+            The base name for the output video file.
+
+    - ### Details:
+
         - The screen resolution is automatically detected.
         - The video is saved in AVI format using the XVID codec.
         - The output file name includes the provided base name followed by the current timestamp.
 
-    Example:
-        record_screen(10, "my_recording")
-        This will record the screen for 10 seconds and save the video as my_recording_YYYY-MM-DD_HH-MM-SS.avi.
+    - ### Example:
 
-    Dependencies:
+        record_screen(10, "my_recording")
+        # This will record the screen for 10 seconds and save the video as 
+        # my_recording_YYYY-MM-DD_HH-MM-SS.avi.
+
+    - ### Dependencies:
+
         pyautogui: Used for capturing screenshots.
         cv2: OpenCV library for video writing.
         numpy: To convert the screenshots into arrays for OpenCV.
@@ -1334,21 +1497,33 @@ def extract_text_from_image_with_google(image_path: str) -> str:
     """
     Extracts text from an image using Google Cloud Vision API.
 
-    Args:
-        image_path (str): The path to the image file from which text needs to be extracted.
+    - ### Args:
 
-    Returns:
-        str: The extracted text from the image. If no text is detected, an empty string is returned.
+        - image_path (str): 
+            The path to the image file from which text needs to be extracted.
 
-    Raises:
+    - ### Environment Variables:
+
+        GOOGLE_APPLICATION_CREDENTIALS: Path to the JSON file with Google Cloud Vision API 
+        credentials.
+        This file can be obtained from the Google Cloud Console:
+        
+        1. Go to [Google Cloud Console](https://console.cloud.google.com/).
+        2. Enable the Vision API and create a service account.
+        3. Download the JSON credentials file and set the path as an environment variable:
+        `os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/path/to/credentials.json"`
+            
+    - ### Returns:
+
+        str: The extracted text from the image. If no text is detected, an empty string is 
+        returned.
+
+    - ### Raises:
+
         Exception: If there is an error with the Google Cloud Vision API request.
     
-    Environment Variables:
-        GOOGLE_APPLICATION_CREDENTIALS: Should be set to the path of the JSON file containing
-        Google Cloud Vision API service account credentials. This can be set using the following:
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/path/to/credentials.json"
+    - ### Example:
 
-    Example:
         text = extract_text_from_image_with_google("/path/to/image.png")
         print(text)
     """
@@ -1386,19 +1561,25 @@ def extract_text_from_image_with_google(image_path: str) -> str:
 def text_recognition_captcha_solver(driver: webdriver, screenshot_name: str):
     """
     Solves a CAPTCHA by taking a screenshot of the CAPTCHA image, extracting the text from the image 
-    using Google Cloud Vision API, and inputting the extracted text into the CAPTCHA input field.
+    using Google Cloud Vision API by using "extract_text_from_image_with_google" function, and inputting the extracted text into the CAPTCHA input field.
 
-    Args:
-        driver (WebDriver): Selenium WebDriver instance controlling the browser.
-        screenshot_name (str): A custom name to append to the screenshot file for identification.
+    - ### Args:
+
+        - driver (WebDriver): 
+            Selenium WebDriver instance controlling the browser.
+        - screenshot_name (str): 
+            A custom name to append to the screenshot file for identification.
     
-    Raises:
+    - ### Raises:
+
         NoSuchElementException: If the CAPTCHA image or text input field is not found on the page.
     
-    Example:
-        captcha_solver(driver, "my_captcha.png"")
+    - ### Example:
+
+        text_recognition_captcha_solver(driver, "my_captcha"")
     
-    Functionality:
+    - ### Functionality:
+
         - The function waits for the CAPTCHA image to become visible.
         - It scrolls the CAPTCHA image into the center of the view using JavaScript.
         - Captures a screenshot of the CAPTCHA image.
@@ -1456,14 +1637,21 @@ def count_string_occurrences_in_html(driver: webdriver, search_string: str, time
     and waits for any dynamic changes in the HTML source before counting the occurrences of the 
     specified string.
 
-    Parameters:
-    driver (WebDriver): The Selenium WebDriver instance used to interact with the webpage.
-    search_string (str): The string to search for in the updated HTML source of the page.
-    timeout (int, optional): Maximum time (in seconds) to wait for the page load and content update. 
-                             Defaults to 10 seconds.
+    - ### Parameters:
 
-    Returns:
-    int: The number of times the search_string appears in the updated HTML source of the page.
+        - driver (WebDriver): 
+            The Selenium WebDriver instance used to interact with the webpage.
+        
+        - search_string (str): 
+            The string to search for in the updated HTML source of the page.
+        
+        - timeout (int, optional):
+            Maximum time (in seconds) to wait for the page load and content update. 
+            Defaults to 10 seconds.
+
+    - ### Returns:
+    
+        int: The number of times the search_string appears in the updated HTML source of the page.
     """
     
     # Sayfanın tam olarak yüklendiğinden emin olun
