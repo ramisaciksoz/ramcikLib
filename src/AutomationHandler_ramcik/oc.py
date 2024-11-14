@@ -574,7 +574,7 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
     
     # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
     qr_exists = check_for_qr_code(driver)
-    if qr_exists:
+    if qr_exists is True:
         send_email("WhatsApp Login Alert","QR kod tarama işlemi gerekiyor. Lütfen programı yenileyin.")  # QR kod istendiğinde email gönder
     
     elif qr_exists == -1:
