@@ -158,28 +158,31 @@ def check_for_qr_code(driver: webdriver) -> bool:
                 
                 # QR kodu bulunca 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleme
                 profile_present = WebDriverWait(driver, 200).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']"))
+                    EC.any_of(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Sohbetler']"))
+                    )
                 )
                 if profile_present:
                     print("Profil açıldı.False döndürülüyor.")
-                    return False
+                    return False # giriş yapıldı
                 else:
                     print("Profil açılmadı. True döndürülüyor.")
-                    return True
+                    return True # QR kodu gerekli
                     
 
             elif profile_present:
                 print("Profil ekranı bulundu. False döndürülüyor.")
-                return False
+                return False # Zaten giriş yapılmış
             
             else:
                 print("Belirtilen elemanlar bulunamadı. True döndürülüyor.")
-                return True
+                return -1  # Eleman bulunamadı
 
         except Exception as e:
             print(f"Hata oluştu: {e}")
             # traceback.print_exc()  # Ayrıntılı hata mesajı
-            return True
+            return -2  # Hata durumu
 
 
 
@@ -573,6 +576,12 @@ def notify_phone_number(phone_number: str, message: str, chrome_profile_path: st
     qr_exists = check_for_qr_code(driver)
     if qr_exists:
         send_email("WhatsApp Login Alert","QR kod tarama işlemi gerekiyor. Lütfen programı yenileyin.")  # QR kod istendiğinde email gönder
+    
+    elif qr_exists == -1:
+        send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.","qr_exists fonksiyonundan -1 döndü, yani Belirtilen elemanlar bulunamadı.")
+    
+    elif qr_exists == -2:
+        send_email(f"Whatsapptan {phone_number} kişisine mesaj atılamadı.",f"qr_exists fonksiyonundan -2 döndü, except bloğuna düştü yani hata oluştu.")
     
     # Yoksa wpweb'deki benim mesajlarıma erişmiş demektir.
     else:

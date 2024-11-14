@@ -1,17 +1,18 @@
 # RAMCIK LIBRARY
 
-e-mail, whatsapp, telegram automation with selenium and API's if provided. Also usefull multi media functions such as capturing screen,
-google cloud text to img captha solver.   
+Effortless automation for **Email**, **WhatsApp**, and **Telegram** via Selenium and available APIs. Includes handy multimedia tools like **screen capture** and **image-to-text conversion with Google Cloud API**. 
 
 ## Table of Contents
 
 1. [Requirements](#requirements)
-2. [pip Install for library](#from-pypi-python-package-index)
-3. [Installation for linux](#installation-for-linux)
-4. [Env Variables for linux](#edit-created-myenvfileenv-for-linux)
-5. [Set Env Variables for linux](#after-editing-env-file-run-python-script)
-6. [Use Library](#to-use-in-python-script)
-7. [Installation for Windows](#installation-for-windows)
+2. [Installation](#installation)
+    - [pip Install for library](#from-pypi-python-package-index)
+    - [Installation for linux](#installation-for-linux)
+    - [Installation for Windows](#installation-for-windows)
+3. [Editing Env Variables](#edit-created-myenvfileenv)
+4. [Setting up Env Variables](#setting-up-environmental-variables)
+5. [Opening WhatsApp Profiles](#opening-whatsapp-profiles)
+6. [Congratulations! Start Using the Library🔥](#congratulations-start-using-the-library)
 
 ---
 
@@ -20,8 +21,10 @@ google cloud text to img captha solver.
 List any prerequisites needed to install or run your library.
 
 - Programming language version (e.g., Python >= 3.8)
-- Dependencies (e.g., `selenium`, `Pillow`, `google-cloud-vision`, `telethon`, `opencv-python`,`numpy`, `pyautogui`, `requests`)
+- Dependencies (e.g., `selenium`, `webdriver-manager`, `Pillow`, `google-cloud-vision`, `telethon`, `opencv-python`,`numpy`, `pyautogui`, `requests`)
 - System requirements (e.g., Linux, Windows)
+
+# Installation
 
 ## From PyPI (Python Package Index)
 
@@ -45,7 +48,7 @@ with open('installMissing.sh', 'w') as file:
 
 from AutomationHandler_ramcik import init_tools
 init_tools.oc_install_deps()
-init_tools.oc_create_myenvfile() # creates a file at /OmnesCore/myenvfile.env
+init_tools.oc_create_myenvfile() # creates a file at $HOME/OmnesCore/myenvfile.env
 #ends here 
 
 ```
@@ -65,36 +68,58 @@ sudo pythonInterpreterPath main.py
 chmod +x installMissing.sh; ./installMissing.sh;
 ```
 
-# Edit created myenvfile.env For Linux
-Edit created file =>  /OmnesCore/myenvfile.env For Linux
+## Installation for windows
+```python
+# main.py
+
+# starts from here!
+import os
+import subprocess
+
+# Check if dotenv is installed, if not, install it
+try:
+    import dotenv
+except ImportError:
+    subprocess.check_call(["pip", "install", "python-dotenv"])
+
+# Continue with the rest of the script after ensuring all dependencies are installed
+from AutomationHandler_ramcik import init_tools
+init_tools.oc_install_deps()
+init_tools.oc_create_myenvfile()  # creates a file at ~/OmnesCore/myenvfile.env in the user's home directory, e.g., C:/Users/Username/OmnesCore/myenvfile.env
+# ends here
+```
+
+# Edit created myenvfile.env
+- Edit created file For Linux =>  $HOME/OmnesCore/myenvfile.env 
+- Edit created file For Windows =>  ~/OmnesCore/myenvfile.env in the user's home directory, e.g., C:/Users/Username/OmnesCore/myenvfile.env 
+
+
 ##### CHROME_PRIMARY_WHATSAPP_PROFILE_PATH 
 ```
+For linux;
 "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "$HOME/OmnesCore/ChromeProfile/primary/profile"
 
-Note: You don't need to edit "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH". You can just use it as default an skip to step 2
-1:
-This is your whatsapp profile path edit this as you wish.
-2:
-You can create profile via functions create_webdriver_with_profile and check_for_qr_code
-code given below.
-3: after doing this if you get an error you probably need give permision to created profile folder
-by executing fallowing command.
-sudo chmod 777 $HOME/OmnesCore/ChromeProfile/primary/profile
-```
-python code would be like:
-```python
-from AutomationHandler_ramcik import oc
-driver = oc.create_webdriver_with_profile()
-oc.check_for_qr_code(driver)
+For windows;
+"CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "C:/Users/Username/OmnesCore/ChromeProfile/primary/profile"
 
+Note: You need to edit `Username` in "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH" variable, then You can just use it as default an skip to step 2.
+
+- This is your whatsapp profile path, if you want to use a different path for primary whatpsapp profile, you can edit this in myenvfile.env as you wish.
 ```
+
 ##### CHROME_SECONDARY_WHATSAPP_PROFILE_PATH
-```
-"CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "$HOME/OmnesCore/ChromeProfile/secondary/profile",
 
-IMPORTANT: If you are not going to use "CHROME_SECONDARY_WHATSAPP_PROFILE_PATH", 
-it should remain an empty string in myenvfile.env. But, If you’re going to use it, we suggest using 
-the path provided above.
+**IMPORTANT**: If you are not going to use `"CHROME_SECONDARY_WHATSAPP_PROFILE_PATH"`, 
+it should remain an `empty string` in `myenvfile.env`. But, If you’re going to use it, we suggest using 
+the path provided following.⚠️
+
+```
+For linux;
+"CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "$HOME/OmnesCore/ChromeProfile/secondary/profile"
+
+For windows;
+"CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "C:/Users/Username/OmnesCore/ChromeProfile/secondary/profile"
+
 
 Note: To send a message to yourself, you can edit this and log in with a different WhatsApp account. 
 The main purpose of this is to notify yourself via WhatsApp by sending a message from one WhatsApp account
@@ -104,22 +129,7 @@ Note-2: Self-notification issues, such as sending a message from the same WhatsA
 does not trigger a notification on the phone), are handled by using CHROME_SECONDARY_WHATSAPP_PROFILE_PATH to 
 eliminate this issue.
 
-1:
-This is your whatsapp second profile path edit this as you wish.
-2:
-You can create profile via functions create_webdriver_with_profile and check_for_qr_code
-with specifying parameter profile_default to 2.
-code given below.
-3: after doing this if you get an error you probably need give permision to created profile folder
-by executing fallowing command.
-sudo chmod 777 $HOME/OmnesCore/ChromeProfile/secondary/profile
-```
-python code would be like:
-```python
-from AutomationHandler_ramcik import oc
-driver = oc.create_webdriver_with_profile(profile_default=2)
-oc.check_for_qr_code(driver)
-
+- This is your whatsapp profile path, if you want to use a different path for second whatpsapp profile, you can edit this in myenvfile.env as you wish.
 ```
 ##### MY_GMAIL
 ```
@@ -128,7 +138,11 @@ your gmail account
 ```
 ##### MY_GOOGLE_APPLICATION_CREDENTIALS
 ```
-"MY_GOOGLE_APPLICATION_CREDENTIALS": "$HOME/OmnesCore/credentials.json",
+For linux;
+"MY_GOOGLE_APPLICATION_CREDENTIALS": "$HOME/OmnesCore/credentials.json"
+
+For windows;
+"MY_GOOGLE_APPLICATION_CREDENTIALS": "C:/Users/Username/OmnesCore/credentials.json"
 
 GOOGLE_APPLICATION_CREDENTIALS: Path to the JSON file with Google Cloud Vision API 
 credentials.
@@ -137,7 +151,7 @@ This file can be obtained from the Google Cloud Console:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/).
 2. Enable the Vision API and create a service account.
 3. Download the JSON credentials file and set the path as an environment variable:
-`os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/path/to/credentials.json"`
+`os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv('MY_GOOGLE_APPLICATION_CREDENTIALS')`
 
 ```
 ##### MY_NUMBER
@@ -168,7 +182,8 @@ Telegram created bot token
 ##### MY_TELEGRAM_BOT_CHAT_ID_WITH_ME
 ```
 "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
-Telegram chat id with created bot
+
+Chat ID between you and your created bot.
 ```
 ##### SENDER_EMAIL
 ```
@@ -181,17 +196,58 @@ A sender mail which used for sending mail
 "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
 A sender mail password which used for sending mail
 ```
-# After Editing .env File run python script 
+
+# Setting up Environmental Variables
+
+### **After Editing `myenvfile.env` File, run python script.**
+
 ```python
 from AutomationHandler_ramcik import init_tools
 init_tools.oc_set_env_from_myenvfile()
 ```
-### run this command or close terminal and reopen 
+
+<u>**For linux;**</u>
+- After running the script above, run the following command `or` close and reopen the terminal:
 ```bash
 source ~/.bashrc
 ```
 
-# To use in python script 
+<u>**For windows;**</u>
+- After running the script above, restart Visual Studio Code:
+
+
+
+# Opening WhatsApp Profiles
+
+### Primary WhatsApp Profile (`CHROME_PRIMARY_WHATSAPP_PROFILE_PATH`)
+
+You can create the profile using the `create_webdriver_with_profile` and `check_for_qr_code` functions, as shown in the code below. If you encounter a permissions error after creating the profile, you may need to grant permission to the profile folder by running the following command:
+
+```python
+from AutomationHandler_ramcik import oc
+driver = oc.create_webdriver_with_profile()
+oc.check_for_qr_code(driver)
+```
+
+```bash
+sudo chmod 777 $HOME/OmnesCore/ChromeProfile/primary/profile
+```
+
+### Secondary WhatsApp Profile (`CHROME_SECONDARY_WHATSAPP_PROFILE_PATH`)
+
+You can create the profile by specifying `profile_default=2` in the `create_webdriver_with_profile` function, along with `check_for_qr_code`, as shown below. If you encounter a permissions error, grant permission to the profile folder with the following command:
+
+```python
+from AutomationHandler_ramcik import oc
+driver = oc.create_webdriver_with_profile(profile_default=2)
+oc.check_for_qr_code(driver)
+```
+
+```bash
+sudo chmod 777 $HOME/OmnesCore/ChromeProfile/secondary/profile
+```
+
+# Congratulations! start using the library🔥
 ```python
 from AutomationHandler_ramcik import oc
 ```
