@@ -142,43 +142,73 @@ def oc_create_myenvfile():
 
 
 
-def oc_use_myenvfile():
+def oc_use_myenvfile(file_name: str = ""):
     """
-    uses (it is set temporarily, not into the system environment variables) environment variables from the `.env` file.
+    Uses (temporarily sets, not into the system environment variables) environment variables from the `.env` or `.txt` file.
 
-    The function temporarily sets environment variables from `myenvfile.env` located in the `OmnesCore` folder at:
-        - `~/OmnesCore/myenvfile.env` in the user's home directory on Windows, e.g., `C:/Users/Username/OmnesCore/myenvfile.env` 
-        - `os.getenv("HOME")+/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems)
+    The function sets environment variables from:
+        - A specified `file_name` if provided (from the current working directory).
+        - Otherwise, defaults to `myenvfile.env` located in the `OmnesCore` folder at:
+            - `~/OmnesCore/myenvfile.env` on Windows, e.g., `C:/Users/Username/OmnesCore/myenvfile.env`
+            - `os.getenv("HOME")+/OmnesCore/myenvfile.env` on Linux or macOS (POSIX systems).
+
+    --------
+    - ### Parameters:
+    --------
+        file_name (str, optional): 
+            Name of the environment file to load (e.g., `custom.env` or `settings.txt`).
+            Defaults to an empty string (`""`), which uses the standard `myenvfile.env`.
+
     --------
     - ### Returns:
     --------
         dict:
             A dictionary containing the environment variables and their values.
+
     --------
     - ### Raises:
-    -------
+    --------
         FileNotFoundError:
             If the `.env` file does not exist at the specified path.
+
     --------
     - ### Example:
     --------
     ```python
-    env_vars = load_env_variables()
+    # Use the default environment file
+    env_vars = oc_use_myenvfile()
+    
+    # Use a custom file from the working directory
+    env_vars = oc_use_myenvfile("settings.txt")
+
     my_gmail = env_vars.get('MY_GMAIL') # or my_gmail = os.getenv('MY_GMAIL')
     print(f"My Gmail: {my_gmail}")
     ```
     """
+    # Use file_name if provided; otherwise, use the global file_path
+    env_path = os.path.join(os.getcwd(), file_name) if file_name else file_path
 
-    # Directly use the file path as a string
-    env_path = file_path
-    
-    # Check if the file exists using os.path.isfile
+    # Print which file is being used
+    if file_name:
+        print(f"Using specified file: {file_name} (Full path: {env_path})")
+    else:
+        print(f"Using default file path: {env_path}")
+
+    # Check if the file exists
     if not os.path.isfile(env_path):
+        print(f"File not found: {env_path}")
         raise FileNotFoundError(f"{env_path} does not exist.")
-    
+    else:
+        print(f"File found: {env_path}")
+
     # Load the environment variables
-    env_vars = dotenv_values(env_path)
-    
+    try:
+        env_vars = dotenv_values(env_path)
+        print(f"Environment variables loaded successfully from: {env_path}")
+    except Exception as e:
+        print(f"Failed to load environment variables: {e}")
+        raise
+
     # Return the loaded environment variables as a dictionary
     return env_vars
 
