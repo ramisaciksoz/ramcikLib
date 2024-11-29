@@ -29,10 +29,12 @@ List any prerequisites needed to install or run your library.
 ## From PyPI (Python Package Index)
 
 ```bash
-pip install -i https://test.pypi.org/simple/AutomationHandler-ramcik
+pip install -i https://test.pypi.org/simple/ AutomationHandler-ramcik
 
-# If you want to uninstall or upgrade
+# If you want to uninstall
 pip uninstall https://test.pypi.org/simple/ AutomationHandler-ramcik
+
+# If you want to upgrade, First uninstall, then install again.
 ```
 ## Installation for linux
 ```python
@@ -102,7 +104,7 @@ For linux;
 For windows;
 "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "C:/Users/Username/OmnesCore/ChromeProfile/primary/profile"
 
-Note: You need to edit `Username` in "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH" variable, then You can just use it as default an skip to step 2.
+Note: You need to check if the file is created in the correct location for the CHROME_PRIMARY_WHATSAPP_PROFILE_PATH variable, then You can just use it as default an skip to step 2.
 
 - This is your whatsapp profile path, if you want to use a different path for primary whatpsapp profile, you can edit this in myenvfile.env as you wish.
 ```
@@ -139,10 +141,10 @@ your gmail account
 ##### MY_GOOGLE_APPLICATION_CREDENTIALS
 ```
 For linux;
-"MY_GOOGLE_APPLICATION_CREDENTIALS": "$HOME/OmnesCore/credentials.json"
+"MY_GOOGLE_APPLICATION_CREDENTIALS": "$HOME/OmnesCore/GoogleVisionCredentials.json"
 
 For windows;
-"MY_GOOGLE_APPLICATION_CREDENTIALS": "C:/Users/Username/OmnesCore/credentials.json"
+"MY_GOOGLE_APPLICATION_CREDENTIALS": "C:/Users/Username/OmnesCore/GoogleVisionCredentials.json"
 
 GOOGLE_APPLICATION_CREDENTIALS: Path to the JSON file with Google Cloud Vision API 
 credentials.
@@ -221,31 +223,83 @@ source ~/.bashrc
 
 ### Primary WhatsApp Profile (`CHROME_PRIMARY_WHATSAPP_PROFILE_PATH`)
 
-You can create the profile using the `create_webdriver_with_profile` and `check_for_qr_code` functions, as shown in the code below. If you encounter a permissions error after creating the profile, you may need to grant permission to the profile folder by running the following command:
+To create and access your primary WhatsApp profile, follow these steps:
+
+### 1. Create the Profile
+
+Use the following Python code to create the profile and check for a QR code:
 
 ```python
 from AutomationHandler_ramcik import oc
+
+# Create a WebDriver instance with the specified profile
 driver = oc.create_webdriver_with_profile()
+
+# Check if the QR code is displayed (to log in if needed)
 oc.check_for_qr_code(driver)
 ```
+
+### 2. Grant Folder Permissions (if needed)
+
+#### Linux
+
+If you encounter a permissions error when trying to access the profile, run the command below to grant the required permissions to the profile folder:
 
 ```bash
 sudo chmod 777 $HOME/OmnesCore/ChromeProfile/primary/profile
 ```
 
+#### Windows
+
+For Windows users, if you face a similar error:
+
+1. Navigate to the profile folder (e.g., `C:\OmnesCore\ChromeProfile\primary\profile`).
+2. Right-click on the folder and select **Properties**.
+3. Go to the **Security** tab and click **Edit**.
+4. Select your user account from the list, then check the **Full Control** box under **Permissions**.
+5. Click **Apply** and then **OK** to save the changes.
+
 ### Secondary WhatsApp Profile (`CHROME_SECONDARY_WHATSAPP_PROFILE_PATH`)
 
-You can create the profile by specifying `profile_default=2` in the `create_webdriver_with_profile` function, along with `check_for_qr_code`, as shown below. If you encounter a permissions error, grant permission to the profile folder with the following command:
+To create and access your secondary WhatsApp profile, follow these steps:
+
+### 1. Create the Profile
+
+Use the following Python code to create the profile and check for a QR code:
+
+You can create the profile by specifying `profile_default=2` in the `create_webdriver_with_profile` function, along with `check_for_qr_code`, as shown below.
 
 ```python
 from AutomationHandler_ramcik import oc
+
+# Create a WebDriver instance with the specified profile
 driver = oc.create_webdriver_with_profile(profile_default=2)
+
+# Check if the QR code is displayed (to log in if needed)
 oc.check_for_qr_code(driver)
 ```
+
+### 2. Grant Folder Permissions (if needed)
+
+#### Linux
+
+If you encounter a permissions error when trying to access the profile, run the command below to grant the required permissions to the profile folder:
 
 ```bash
 sudo chmod 777 $HOME/OmnesCore/ChromeProfile/secondary/profile
 ```
+
+#### Windows
+
+For Windows users, if you face a similar error:
+
+1. Navigate to the profile folder (e.g., `C:\OmnesCore\ChromeProfile\secondary\profile`).
+2. Right-click on the folder and select **Properties**.
+3. Go to the **Security** tab and click **Edit**.
+4. Select your user account from the list, then check the **Full Control** box under **Permissions**.
+5. Click **Apply** and then **OK** to save the changes.
+
+
 
 # Congratulations! start using the library🔥
 ```python

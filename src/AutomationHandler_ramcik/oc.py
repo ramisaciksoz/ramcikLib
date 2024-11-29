@@ -25,7 +25,9 @@ from email.mime.base import MIMEBase  # E-posta eki oluşturma modülü
 import cv2
 import numpy as np
 import pyautogui
-
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from telethon.tl.functions.contacts import ImportContactsRequest
+from telethon.tl.types import InputPhoneContact
 
 ### whatsapp'a linkle giriş eklenecek qr kod gibi
 ### sms atma fonksiyonu
@@ -92,6 +94,13 @@ def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default
     # Headless modun aktif olup olmadığını kontrol ediyoruz.
     if headless:
         options.add_argument('--headless')
+
+    # Performance loglarını etkinleştiriyoruz
+    caps = DesiredCapabilities.CHROME.copy()
+    caps["goog:loggingPrefs"] = {"performance": "ALL"}
+
+    # Capabilities ile options'u birleştiriyoruz
+    options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
     # WebDriver'ı başlat
     driver = webdriver.Chrome(options=options)
@@ -165,6 +174,11 @@ def check_for_qr_code(driver: webdriver) -> bool:
                 )
                 if profile_present:
                     print("Profil açıldı.False döndürülüyor.")
+                    if wait_for_network_stabilization(driver):
+                        if wait_for_page_render(driver):
+                            print("WhatsApp Web tamamen yüklendi, mesaj göndermeye hazır.")
+                    else:
+                        print("Yükleme tamamlanmadı, lütfen tekrar deneyin.")
                     return False # giriş yapıldı
                 else:
                     print("Profil açılmadı. True döndürülüyor.")
@@ -173,6 +187,11 @@ def check_for_qr_code(driver: webdriver) -> bool:
 
             elif profile_present:
                 print("Profil ekranı bulundu. False döndürülüyor.")
+                if wait_for_network_stabilization(driver):
+                    if wait_for_page_render(driver):
+                        print("WhatsApp Web tamamen yüklendi, mesaj göndermeye hazır.")
+                else:
+                    print("Yükleme tamamlanmadı, lütfen tekrar deneyin.")
                 return False # Zaten giriş yapılmış
             
             else:
@@ -252,15 +271,28 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
             msg_box.send_keys(message + Keys.ENTER)
 
             # Mesajın gönderilmesi için bekleniyor.
+
+            # "msg-time" ikonunun bulmayı bekle
             WebDriverWait(driver, 300).until(
                 EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            sent_success = WebDriverWait(driver, 300).until(
+            # "msg-time" ikonunun kaybolmasını bekle
+            WebDriverWait(driver, 300).until(
                 EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            if sent_success:
+            # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
+            sent_success_icon = WebDriverWait(driver, 300).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        f'(.//div[@role="row" and .//span[contains(text(), "{message}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                    )
+                )
+            )
+
+            if sent_success_icon:
                 print("Mesaj başarılı bir şekilde gönderildi.")
             else:
                 print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
@@ -342,15 +374,28 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
             msg_box.send_keys(message + Keys.ENTER)
 
             # Mesajın gönderilmesi için bekleniyor.
+            
+            # "msg-time" ikonunun bulmayı bekle
             WebDriverWait(driver, 300).until(
                 EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            sent_success = WebDriverWait(driver, 300).until(
+            # "msg-time" ikonunun kaybolmasını bekle
+            WebDriverWait(driver, 300).until(
                 EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            if sent_success:
+            # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
+            sent_success_icon = WebDriverWait(driver, 300).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        f'(.//div[@role="row" and .//span[contains(text(), "{message}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                    )
+                )
+            )
+
+            if sent_success_icon:
                 print("Mesaj başarılı bir şekilde gönderildi.")
             else:
                 print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
@@ -365,12 +410,12 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
 
 def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, driver: webdriver) -> tuple[bool, Exception | None]:
     """
-    Sends a file (e.g., image, video, PDF, document) to a specified WhatsApp group or **individual contact** using Selenium WebDriver.
+    Sends a file (e.g., image, video, PDF, document) to a specified WhatsApp group or `individual contact` using Selenium WebDriver.
 
     - ### Parameters:
 
         - group_name (str): 
-            The name of the WhatsApp group or **individual contact** where the file will be sent. 
+            The name of the WhatsApp group or individual contact where the file will be sent. 
             The group name or contact name should match exactly as it appears in WhatsApp. The 
             function can send files to both groups and individual contacts whose numbers are saved 
             with their full names.
@@ -439,8 +484,8 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
             # Ataç simgesine tıkla
             attach_button = WebDriverWait(driver, 100).until(
                 EC.any_of(
-                    EC.presence_of_element_located((By.XPATH, "//div[@title='Attach']")),
-                    EC.presence_of_element_located((By.XPATH, "//div[@title='Ekle']"))
+                    EC.presence_of_element_located((By.XPATH, '//button[@title="Attach" and @aria-label="Attach"]')),
+                    EC.presence_of_element_located((By.XPATH, '//button[@title="Ekle" and @aria-label="Ekle"]'))
                 )
             )
             attach_button.click()
@@ -465,15 +510,28 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
             send_button.click()
 
             # Mesajın gönderilmesi için bekleniyor.
+
+            # "msg-time" ikonunun bulmayı bekle
             WebDriverWait(driver, 300).until(
                 EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            sent_success = WebDriverWait(driver, 300).until(
+            # "msg-time" ikonunun kaybolmasını bekle
+            WebDriverWait(driver, 300).until(
                 EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
             )
 
-            if sent_success:
+            # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
+            sent_success_icon = WebDriverWait(driver, 300).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        '(//div[@role="row" and .//img[starts-with(@src, "data:image") or starts-with(@src, "blob:")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                    )
+                )
+            )
+
+            if sent_success_icon:
                 print("Dosya başarılı bir şekilde gönderildi.")
             else:
                 print("Dosya hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
@@ -1146,172 +1204,367 @@ def send_email_with_attachments(subject: str, body: str, attachment_files: list,
 ##################### Telegram fonksiyonları ############################
 
 
-def telegram_send_message(
+def send_telegram_message(
     message: str, 
-    recipient: str = None, 
+    recipient_username: str = None, 
     recipient_phone: str = None, 
-    my_phone_number: str = None, 
+    chat_id: str = None, 
     api_id: str = None, 
-    api_hash: str = None, 
-    token: str = None, 
-    chat_id: str = None
+    api_hash: str = None,
+    session_name: str = "my_telegram_session"
 ) -> bool:
     """
-    A function that sends a message via Telegram. It works with either the recipient's username (recipient) or phone number (recipient_phone).
-    
+    Sends a message via Telegram. Only one of 'recipient_username', 'recipient_phone', or 'chat_id' 
+    is required to send the message.
+
+    - ### What is this function?
+        This function allows you to send messages via your own Telegram account using the Telethon library. 
+        It works with either a Telegram username, phone number, or chat ID.
+
     - ### Args:
 
-        - message (str): 
+        - `message` (str): 
             The message to be sent.
 
-        - recipient (str): 
-            The Telegram username of the recipient to whom the message will be sent.
+        - `recipient_username` (str): 
+            Telegram username of the recipient (e.g., `@username`).
 
-        - recipient_phone (str): 
-            The phone number of the recipient to whom the message will be sent.
+        - `recipient_phone` (str): 
+            Phone number of the recipient (e.g., `+905551234567`).
 
-        - my_phone_number (str): 
-            Your own phone number. If not provided to the function, it will be retrieved from 
-            environment variables.
+        - `chat_id` (str): 
+            Chat ID for the recipient (e.g., `123456789`).
 
-        - api_id (str): 
-            Telegram API ID. If not provided to the function, it will be retrieved from 
-            environment variables.
+        - `api_id` (str): 
+            Telegram API ID. If not provided, it will be retrieved from environment variables.
 
-        - api_hash (str): 
-            Telegram API Hash. If not provided to the function, it will be retrieved from 
-            environment variables.
+        - `api_hash` (str): 
         
+            Telegram API Hash. If not provided, it will be retrieved from environment variables.
+
+        - `session_name` (str, optional): 
+            The name of the session file to be created or reused. Defaults to `"my_telegram_session"`.
+
     - ### Returns:
 
-        bool: Returns True if the message was successfully sent, otherwise returns False.
+        - `bool`: 
+            `True` if the message was sent successfully, otherwise `False`.
+        
+    - ### How to Use This Function:
+
+        #### Step 1: Obtain Telegram API Credentials
+        1. Go to the Telegram [API Development Tools](https://my.telegram.org/apps) page.
+        2. Log in with your Telegram account.
+        3. Create a new application by providing a name, a short description, and a platform.
+        4. Once created, Telegram will provide you with:
+            - `api_id` (e.g., `123456`)
+            - `api_hash` (e.g., `abcd1234efgh5678ijkl`)
+        5. Save these credentials securely.
+
+        #### Step 2: Set Up Environment Variables
+        1. To avoid passing `api_id` and `api_hash` directly in the function, you can save them as environment variables.
+        2. On **Linux/Mac**:
+            - Open your terminal and edit your shell configuration file (`~/.bashrc`, `~/.zshrc`, or `~/.bash_profile`):
+            ```bash
+            export MY_TELEGRAM_API_ID="123456"
+            export MY_TELEGRAM_API_HASH="abcd1234efgh5678ijkl"
+            ```
+            - Save the file and reload the configuration:
+            ```bash
+            source ~/.bashrc
+            ```
+
+        3. On Windows:
+            - Open the Command Prompt (as Administrator).
+            - Use the `setx` command to add the environment variables:
+            ```cmd
+            setx MY_TELEGRAM_API_ID "123456"
+            setx MY_TELEGRAM_API_HASH "abcd1234efgh5678ijkl"
+            ```
+            - Note: After setting the variables with `setx`, you need to restart your terminal or application to apply the changes.
+
+        #### Step 3: Authenticate Your Telegram Account
+        1. When you first run this function, Telethon will attempt to authenticate your account.
+        2. It will open a session and ask for a phone number (the one associated with your Telegram account).
+        3. You will receive a confirmation code in Telegram. Enter this code when prompted.
+        4. After successful authentication, Telethon will save a session file (`my_telegram_session.session`) in the current directory for future use.
+
+        
+        #### Step 4: Obtain User, Group, or Channel IDs:
+            ##### For Users:
+            1. Add the user to your Telegram contacts or ensure you’ve interacted with them (e.g., sent or received a message).
+            2. Use the following Python code to fetch the user's `chat_id`:
+                ```python
+                from telethon.sync import TelegramClient
+
+                client = TelegramClient("my_telegram_session", "API_ID", "API_HASH")
+                client.start()
+
+                for dialog in client.iter_dialogs():
+                    if dialog.is_user:
+                        print(f"User Name: {dialog.name}, Chat ID: {dialog.id}")
+                ```
+            3. Look for the **positive numeric ID** corresponding to the user.
+
+            ##### For Groups:
+            1. Add your Telegram account to the group.
+            2. use the same Python code above to fetch its numeric ID.      
+            3. Look for the **negative numeric ID** corresponding to your group.
+
+            ##### For Channels:
+            1. Add your Telegram account to the channel.
+            2. Channels often have usernames (e.g., `@MyChannel`). You can use this directly as `recipient_username`.
+            3. If the channel doesn’t have a username, use the same Python code above to fetch its numeric ID.        
+
+        #### Step 5: Use This Function:
+        - Choose one of the following methods to identify the recipient:
+            1. **For Users:**
+                - Use `recipient_username` (e.g., `@username`) or `recipient_phone` (e.g., `+905551234567`).
+            2. **For Groups:**
+                - Add your account to the group or channel.
+                - Use `chat_id` to send a message directly to the group. Group IDs are typically **negative numbers**.
+            3. **For Channels:**
+                - Add your account to the channel as an admin if required.
+                - Use `chat_id` (e.g., channel's username as `@channel_name` or its numeric ID).
+        
+    - ### Notes:
+        - Ensure that the recipient is reachable (e.g., they haven't blocked you or deleted their Telegram account).
+        - The first-time authentication process requires a valid phone number and code.
+        - If using `recipient_phone`, ensure the phone number is registered on Telegram.
+        - If you specify a custom `session_name`, a separate session file will be created.
+
+    - ### Examples:
+
+        #### Example 1: Send a message using a Telegram username
+        ```python
+        send_telegram_message(
+            message="Hello, this is a message to a user!",
+            recipient_username="@john_doe"
+        )
+        ```
+
+        #### Example 2: Send a message using a phone number
+        ```python
+        send_telegram_message(
+            message="Hello, this is a message to a phone number!",
+            recipient_phone="+905551234567"
+        )
+        ```
+
+        #### Example 3: Send a message using a chat ID
+        ```python
+        send_telegram_message(
+            message="Hello, this is a message to a chat ID!",
+            chat_id="123456789"
+        )
+        ```
     """
 
-    # Eğer fonksiyona API ID, API Hash veya telefon numarası verilmediyse çevresel değişkenlerden alıyoruz.
+    # At least one recipient is required
+    if not (recipient_username or recipient_phone or chat_id):
+        print("Error: You must provide either 'recipient_username', 'recipient_phone', or 'chat_id'.")
+        return False
+
+    # Retrieve API credentials from environment variables if not provided
     if not api_id:
         api_id = os.getenv('MY_TELEGRAM_API_ID')
         if not api_id:
-            print("""Çevresel değişkenlerde 'MY_TELEGRAM_API_ID' bulunamadı veya 'api_id' sağlanmadı. Lütfen birini temin edin.""")
+            print("Error: 'api_id' is not provided and 'MY_TELEGRAM_API_ID' is not set in environment variables. "
+                  "Please retrieve your API ID from https://my.telegram.org/apps.")
             return False
-    
+
     if not api_hash:
         api_hash = os.getenv('MY_TELEGRAM_API_HASH')
         if not api_hash:
-            print("""Çevresel değişkenlerde 'MY_TELEGRAM_API_HASH' bulunamadı veya 'api_hash' sağlanmadı. Lütfen birini temin edin.""")
+            print("Error: 'api_hash' is not provided and 'MY_TELEGRAM_API_HASH' is not set in environment variables. "
+                  "Please retrieve your API Hash from https://my.telegram.org/apps.")
             return False
 
-    if not my_phone_number:
-        my_phone_number = os.getenv('MY_NUMBER')
-        if not my_phone_number:
-            print("""Çevresel değişkenlerde 'MY_NUMBER' bulunamadı veya 'my_phone_number' sağlanmadı. Lütfen birini temin edin.""")
-            return False
-    
-    # Telegram istemcisini başlatıyoruz
-    client = TelegramClient('session_name', api_id, api_hash)
-    client.start(my_phone_number)
+    # Initialize Telegram client
+    client = TelegramClient(session_name, api_id, api_hash)
+    client.start()
 
     try:
-        if recipient:
-            # Kullanıcı adı üzerinden mesaj gönder
-            client.send_message(recipient, message)
-            print(f"Message sent to username: {recipient}")
-            return True
+        if recipient_username:
+            if not recipient_username.startswith("@"):
+                print("Error: 'recipient_username' must start with '@'.")
+                return False
+            # Send message using username
+            client.send_message(recipient_username, message)
+            print(f"Message sent to username: {recipient_username}")
         elif recipient_phone:
-            # Telefon numarası ile kullanıcıyı bul ve mesaj gönder
-            if recipient_phone == os.getenv('MY_NUMBER'):
-                send_telegram_bot_message_to_self(message, token, chat_id)
-                return
-            else:
-                user = client.get_entity(recipient_phone)
+            # Find user by phone number and send message
+            contact = InputPhoneContact(client_id=0, phone=recipient_phone, first_name="", last_name="")
+            result = client(ImportContactsRequest([contact]))
+            user = result.users[0] if result.users else None
+            if not user:
+                print(f"Error: Could not find user with phone number {recipient_phone}.")
+                return False
             client.send_message(user, message)
             print(f"Message sent to phone number: {recipient_phone}")
-            return True
+        elif chat_id:
+            # Send message directly using chat ID
+            client.send_message(int(chat_id), message)
+            print(f"Message sent to chat ID: {chat_id}")
         else:
-            print("No recipient provided. Please provide a username or phone number.")
+            print("Error: Unexpected case. Check input parameters.")
             return False
-    except PeerIdInvalidError:
-        print(f"Failed to find recipient with phone number: {recipient_phone}")
-        return False
+
+        return True
+
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"An error occurred: {e}")
         return False
+
     finally:
         client.disconnect()
 
 
-def send_telegram_bot_message_to_self(message: str, bot_token: str = None, chat_id: str = None) -> bool:
-    """
-    Sends a message to yourself using a Telegram bot, which can trigger a notification on your device.
 
-    This function utilizes the Telegram Bot API to send a text message to the chat ID 
-    (typically your own user ID) using the bot's API token.
+def send_telegram_message_with_bot(
+    message: str,
+    chat_id: str,
+    token: str = None
+) -> bool:
+    """
+    Sends a message via a Telegram bot to a specified chat ID. 
+
+    This function uses the Telegram Bot API to send a message to a specific user, group, or channel via a bot.
+
+    If `chat_id="me"` is provided, the function will use the `MY_TELEGRAM_BOT_CHAT_ID_WITH_ME` environment variable to send a message to yourself.
 
     - ### Args:
 
-        - message (str): 
-            The message content to be sent via Telegram.
+        - `message` (str): 
+            The message you want to send.
 
-        - bot_token (str, optional): 
-            The API token of your Telegram bot. If not provided, it will attempt to use the 
-            'MY_TELEGRAM_BOT_TOKEN' environment variable.
-        
-        - chat_id (str, optional): 
-            The Telegram chat ID to send the message to. If not provided, it will attempt to use 
-            the 'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME' environment variable.
+        - `chat_id` (str): 
+            The chat ID of the user, group, or channel. Use `"me"` to send a message to yourself.
+
+        - `token` (str, optional): 
+            The Telegram bot token. If not provided, it will be retrieved from the `MY_TELEGRAM_BOT_TOKEN` environment variable.
 
     - ### Returns:
 
-        bool: True if the message was sent successfully, False otherwise.
+        - bool: 
+            Returns `True` if the message was sent successfully, otherwise `False`.    
 
-    - ### Usage:
+    - ### How to Use This Function:
 
-        1. You need to create a bot through Telegram's BotFather and get the bot token.
-        2. Optionally, set up environment variables 'MY_TELEGRAM_BOT_TOKEN' and 
-           'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME'.
-        3. Call this function with a message to send.
+        #### Step 1: Create a Telegram Bot
+        1. Open Telegram and search for `@BotFather`.
+        2. Start a chat with `@BotFather` and use the `/newbot` command to create a new bot.
+        3. Follow the instructions to name your bot and create a username (e.g., `MyTestBot`).
+        4. `@BotFather` will give you a unique token in this format:
+        ```
+        123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+        ```
+        Save this token. You will need it to send messages.
 
-    - ### Example:
-    
-        send_telegram_bot_message_to_self("Hello, this is a test message!")
+        #### Step 2: Set Up Permanent Environment Variables
+        1. Add the following environment variables to your system **permanently**:
+            - `MY_TELEGRAM_BOT_TOKEN` (the bot token)
+            - `MY_TELEGRAM_BOT_CHAT_ID_WITH_ME` (your personal chat ID with the bot, optional)
 
-    - ### Error Handling:
+        2. On Linux/Mac:
+            - Open your terminal and edit your shell configuration file (`~/.bashrc`, `~/.zshrc`, or `~/.bash_profile`):
+            ```bash
+            export MY_TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+            export MY_TELEGRAM_BOT_CHAT_ID_WITH_ME="123456789"
+            ```
+            - Save the file and reload the configuration:
+            ```bash
+            source ~/.bashrc
+            ```
 
-        - If the bot_token or chat_id is not provided, and the relevant environment variables 
-        are not set, the function will return False with an informative message.
-        - In case of a request error (e.g., network issues), the function will catch the exception 
-        and return False, printing the error message.
+        3. On Windows: 
+            - Open the Command Prompt (as Administrator).
+            - Use the `setx` command to add the environment variables:
+            ```cmd
+            setx MY_TELEGRAM_BOT_TOKEN "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+            setx MY_TELEGRAM_BOT_CHAT_ID_WITH_ME "123456789"
+            ```
+            - Note: After setting the variables with `setx`, you need to restart your terminal or application to apply the changes.
+
+        ### NEXT STEPS:
+        For step-by-step instructions on the process below, consult the `send_telegram_message` function:
+
+        #### Step 4: Obtain User, Group, or Channel IDs:
+        Detailed instructions on retrieving `chat_id` values for users, groups, or channels.
+
+        #### Step 5: Use This Function:
+        Step-by-step guidance on how to call the function with the correct parameters for sending messages.
+
+        
+    - ### Notes:
+        - Ensure that the user, group, or channel has started the bot by sending `/start`. Otherwise, the bot cannot send messages to users.
+        - Groups and channels do not require `/start`, but the bot must have the necessary permissions.
+
+    - ### Examples:
+
+        #### Example 1: Send a message to yourself
+        ```python
+        send_telegram_message_with_bot(
+            message="Hello, this is a test message for myself!",
+            chat_id="me"
+        )
+        ```
+
+        #### Example 2: Send a message directly with a token
+        ```python
+        send_telegram_message_with_bot(
+            message="Hello, this is a test message from the bot!",
+            chat_id="123456789",
+            token="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+        )
+        ```
+
+        #### Example 3: Use environment variables for token and chat ID
+        ```python
+        send_telegram_message_with_bot(
+            message="This message uses environment variables for credentials.",
+            chat_id="123456789"
+        )
+        ```
     """
-
-    if not bot_token:
-        bot_token = os.getenv('MY_TELEGRAM_BOT_TOKEN')
-        if not bot_token:
-            print("""Çevresel değişkenlerde 'MY_TELEGRAM_BOT_TOKEN' bulunamadı veya 'bot_token' sağlanmadı. Lütfen birini temin edin.""")
+    # Handle optional token from environment variable
+    if token is None:
+        token = os.getenv("MY_TELEGRAM_BOT_TOKEN")
+        if not token:
+            print(
+                "Error: No token provided and 'MY_TELEGRAM_BOT_TOKEN' is not set in environment variables. "
+                "Please provide a valid token or set the environment variable."
+            )
             return False
-    
-    if not chat_id:
-        chat_id = os.getenv('MY_TELEGRAM_BOT_CHAT_ID_WITH_ME')
+
+    # Handle "me" chat_id
+    if chat_id == "me":
+        chat_id = os.getenv("MY_TELEGRAM_BOT_CHAT_ID_WITH_ME")
         if not chat_id:
-            print("""Çevresel değişkenlerde 'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME' bulunamadı veya 'chat_id' sağlanmadı. Lütfen birini temin edin.""")
+            print(
+                "Error: 'MY_TELEGRAM_BOT_CHAT_ID_WITH_ME' is not set in environment variables. "
+                "Please set this variable or provide a valid chat_id."
+            )
             return False
 
-
-
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    data = {
+    # Telegram Bot API URL
+    bot_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
         "chat_id": chat_id,
         "text": message
     }
 
     try:
-        response = requests.post(url, data=data)
+        response = requests.post(bot_url, data=payload)
         if response.status_code == 200:
-            print("Message sent successfully!")
+            print(f"Message sent to chat ID: {chat_id}")
             return True
         else:
-            print(f"Failed to send message. Status code: {response.status_code}")
+            error_description = response.json().get("description", "No additional error details provided.")
+            print(f"Failed to send message. Status: {response.status_code}, Error: {error_description}")
             return False
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"An unexpected error occurred: {e}")
         return False
     
 
@@ -1697,3 +1950,109 @@ def count_string_occurrences_in_html(driver: webdriver, search_string: str, time
 
     return count
 
+def wait_for_page_render(driver: webdriver, check_interval: int = 2, max_checks: int = 20) -> bool:
+    """
+    Waits until the browser's page rendering is complete by comparing HTML content.
+
+    - ### Parameters:
+
+        - driver (WebDriver): 
+            The WebDriver instance for the browser.
+        - check_interval (int): 
+            The interval (in seconds) between HTML comparisons. Defaults to 2 seconds.
+        - max_checks (int): 
+            The maximum number of comparisons to perform before timing out. Defaults to 10.
+
+    - ### Returns:
+    
+        bool: True if the page is fully rendered, False otherwise.
+
+    - ### Notes:
+    
+        - This function retrieves the current page's HTML and compares it over time.
+        - If the HTML remains unchanged for `check_interval` seconds across consecutive checks, 
+          it assumes the page is fully rendered.
+    """
+    try:
+        previous_html = driver.page_source  # Get initial HTML
+
+        for check in range(max_checks):
+            time.sleep(check_interval)  # Bekleme süresi
+            current_html = driver.page_source  # Yeni HTML al
+            
+            if current_html == previous_html:
+                print(f"Sayfa render edildi. Toplam geçen süre: {check_interval * (check + 1)} saniye.")
+                return True  # HTML aynı ise render işlemi tamam
+            else:
+                print(f"Render devam ediyor. Kontrol sayısı: {check + 1}/{max_checks}")
+                previous_html = current_html  # Yeni HTML'yi öncekiyle değiştir
+
+        print("Render işlemi tamamlanmadı, zaman aşımına uğradı.")
+        return False  # Maksimum kontrol sayısını aşarsa zaman aşımı
+    except Exception as e:
+        print(f"Render kontrolü sırasında hata oluştu: {e}")
+        return False
+
+def wait_for_network_stabilization(driver: webdriver, max_inactive_time: int = 2, threshold: int = 5, stable_checks: int = 3) -> bool:
+    """
+    Waits until the network activity stabilizes for a given WebDriver session.
+
+    - ### Parameters:
+
+        - driver (WebDriver): 
+            The WebDriver instance to monitor network activity.
+        - max_inactive_time (int): 
+            The duration (in seconds) of low network activity to consider as stable. Defaults to 2 seconds.
+        - threshold (int): 
+            The maximum number of network requests allowed during the inactive period. Defaults to 5 requests.
+        - stable_checks (int): 
+            The number of consecutive stable periods required to confirm stabilization. Defaults to 3.
+
+    - ### Returns:
+
+        bool: True if the network stabilizes successfully, False otherwise.
+
+    - ### Notes:
+    
+        This function assumes that performance logging is enabled in the WebDriver instance.
+    """
+    start_time = time.time()
+    try:
+        stable_count = 0
+        while stable_count < stable_checks:
+            # Get the initial network traffic
+            logs_before = driver.get_log("performance")
+            traffic_before = len([log for log in logs_before if "Network.responseReceived" in log["message"]])
+
+            # Wait for the specified inactive period
+            time.sleep(max_inactive_time)
+
+            # Get the network traffic after the wait
+            logs_after = driver.get_log("performance")
+            traffic_after = len([log for log in logs_after if "Network.responseReceived" in log["message"]])
+
+            # Log traffic details
+            print(f"Traffic Before: {traffic_before}, Traffic After: {traffic_after}, Difference: {traffic_after - traffic_before}")
+
+            # Check if the traffic difference is below the threshold
+            if traffic_after - traffic_before < threshold:
+                stable_count += 1
+                print(f"Stable count incremented: {stable_count}/{stable_checks}")
+            else:
+                stable_count = 0  # Reset if activity exceeds the threshold
+                print("Traffic increased; stable count reset.")
+
+        print("Network activity stabilized.")
+
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"wait_for_network_stabilization fonksiyonu toplam çalışma süresi: {duration:.2f} saniye.")
+
+        return True
+    except Exception as e:
+        print(f"Error during network stabilization: {e}")
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"wait_for_network_stabilization fonksiyonu toplam çalışma süresi: {duration:.2f} saniye.")
+        return False
+    

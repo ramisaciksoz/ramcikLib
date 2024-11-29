@@ -69,14 +69,19 @@ def oc_create_myenvfile():
     oc_create_myenvfile()
     ```
     """
-
-    # Dummy environment variables with descriptive placeholder values
+        
     if os.name == 'nt':
+
+        # Get the user's home directory and construct the path
+        user_home = os.path.expanduser("~").replace("\\", "/")
+        folder_path = os.path.join(user_home, "OmnesCore")
+        file_path = os.path.join(folder_path, "myenvfile.env")
+
         required_env_vars = {
-            "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": "C:/Users/Username/OmnesCore/ChromeProfile/primary/profile",
+            "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": user_home + "/OmnesCore/ChromeProfile/primary/profile",
             "CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "",
             "MY_GMAIL": "example@gmail.com",
-            "MY_GOOGLE_APPLICATION_CREDENTIALS": "C:/Users/Username/OmnesCore/credentials.json",
+            "MY_GOOGLE_APPLICATION_CREDENTIALS": user_home + "/OmnesCore/GoogleVisionCredentials.json",
             "MY_NUMBER": "+1234567890",
             "MY_TELEGRAM_API_HASH": "your-telegram-api-hash",
             "MY_TELEGRAM_API_ID": "your-telegram-api-id",
@@ -86,17 +91,12 @@ def oc_create_myenvfile():
             "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
         }
 
-        # Get the user's home directory and construct the path
-        user_home = os.path.expanduser("~")
-        folder_path = os.path.join(user_home, "OmnesCore")
-        file_path = os.path.join(folder_path, "myenvfile.env")
-
     if os.name == 'posix':
         required_env_vars = {
             "CHROME_PRIMARY_WHATSAPP_PROFILE_PATH": os.getenv("HOME")+"/OmnesCore/ChromeProfile/primary/profile",
             "CHROME_SECONDARY_WHATSAPP_PROFILE_PATH": "",
             "MY_GMAIL": "example@gmail.com",
-            "MY_GOOGLE_APPLICATION_CREDENTIALS": os.getenv("HOME")+"/OmnesCore/credentials.json",
+            "MY_GOOGLE_APPLICATION_CREDENTIALS": os.getenv("HOME")+"/OmnesCore/GoogleVisionCredentials.json",
             "MY_NUMBER": "+1234567890",
             "MY_TELEGRAM_API_HASH": "your-telegram-api-hash",
             "MY_TELEGRAM_API_ID": "your-telegram-api-id",
