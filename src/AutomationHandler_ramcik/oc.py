@@ -28,7 +28,7 @@ import pyautogui
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from telethon.tl.functions.contacts import ImportContactsRequest
 from telethon.tl.types import InputPhoneContact
-
+import random
 ### whatsapp'a linkle giriş eklenecek qr kod gibi
 ### sms atma fonksiyonu
 
@@ -272,7 +272,14 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
             for line in message.splitlines():
                 if line.strip():  # Satır boş değilse
                 
-                    msg_box.send_keys(line + Keys.ENTER)
+                    # 0 ile 10^10 arasında rastgele bir sayı oluştur
+                    random_number = random.randint(0, 10**10)
+
+                    # Benzersiz bir marker oluştur 
+                    unique_marker = to_custom_base5_with_unicode(random_number)
+                    unique_line = line + unique_marker
+                    print(repr((unique_line)))
+                    msg_box.send_keys(unique_line + Keys.ENTER)
 
                     # Mesajın gönderilmesi için bekleniyor.
 
@@ -291,7 +298,7 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
                         EC.presence_of_element_located(
                             (
                                 By.XPATH,
-                                f'(.//div[@role="row" and .//span[contains(text(), "{line}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                                f'(.//div[@role="row" and .//span[contains(text(), "{unique_marker}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
                             )
                         )
                     )
@@ -379,7 +386,14 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
             for line in message.splitlines():
                 if line.strip():  # Satır boş değilse
                 
-                    msg_box.send_keys(line + Keys.ENTER)
+                    # 0 ile 10^10 arasında rastgele bir sayı oluştur
+                    random_number = random.randint(0, 10**10)
+
+                    # Benzersiz bir marker oluştur 
+                    unique_marker = to_custom_base5_with_unicode(random_number)
+                    unique_line = line + unique_marker
+                    print(repr((unique_line)))
+                    msg_box.send_keys(unique_line + Keys.ENTER)
 
                     # Mesajın gönderilmesi için bekleniyor.
 
@@ -398,7 +412,7 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
                         EC.presence_of_element_located(
                             (
                                 By.XPATH,
-                                f'(.//div[@role="row" and .//span[contains(text(), "{line}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                                f'(.//div[@role="row" and .//span[contains(text(), "{unique_marker}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
                             )
                         )
                     )
@@ -2089,3 +2103,51 @@ def wait_for_network_stabilization(driver: webdriver, max_inactive_time: int = 2
         print(f"wait_for_network_stabilization fonksiyonu toplam çalışma süresi: {duration:.2f} saniye.")
         return False
     
+def to_custom_base5_with_unicode(number):
+    """
+    Converts a non-negative integer into a custom base-5 format using specific invisible Unicode characters.
+
+    **Custom Base-5 Unicode Mapping:**
+    - 0 -> \u200E (Left-to-Right Mark)
+    - 1 -> \u200B (Zero Width Space)
+    - 2 -> \u200C (Zero Width Non-Joiner)
+    - 3 -> \u200D (Zero Width Joiner)
+    - 4 -> \u2060 (Word Joiner)
+
+    The function returns the converted number in the custom base-5 format, where:
+    - Base-5 digits (0, 1, 2, 3, 4) are replaced with the corresponding Unicode characters.
+    - The result is constructed by repeatedly dividing the number by 5 and recording the remainders.
+
+    **Parameters:**
+    - `number` (int): A non-negative integer to be converted.
+
+    **Returns:**
+    - str: The number in the custom base-5 format using Unicode characters.
+
+    **Raises:**
+    - ValueError: If the input number is negative.
+
+    **Examples:**
+    ```python
+    print(repr(to_custom_base5_with_unicode(0)))   # Output: '\u200E'
+    print(repr(to_custom_base5_with_unicode(4)))   # Output: '\u2060'
+    print(repr(to_custom_base5_with_unicode(5)))   # Output: '\u200B\u200E'
+    print(repr(to_custom_base5_with_unicode(23)))  # Output: '\u200C\u200D'
+    ```
+    """
+    if number < 0:
+        raise ValueError("Number must be non-negative")
+    if number == 0:
+        return "\u200E"  # 0 yerine
+
+    # 0-4 yerine Unicode karakterlerini kullanıyoruz
+    unicode_map = ["\u200E", "\u200B", "\u200C", "\u200D", "\u2060"]  # 0, 1, 2, 3, 4 sırasıyla
+
+    digits = []
+    while number > 0:
+        remainder = number % 5
+        custom_digit = unicode_map[remainder]  # 0-4'ü Unicode karakterlerine eşliyoruz
+        digits.append(custom_digit)
+        number //= 5
+
+    return "".join(reversed(digits))
