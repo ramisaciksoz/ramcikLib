@@ -268,35 +268,39 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
-            msg_box.send_keys(message + Keys.ENTER)
 
-            # Mesajın gönderilmesi için bekleniyor.
+            for line in message.splitlines():
+                if line.strip():  # Satır boş değilse
+                
+                    msg_box.send_keys(line + Keys.ENTER)
 
-            # "msg-time" ikonunun bulmayı bekle
-            WebDriverWait(driver, 300).until(
-                EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-            )
+                    # Mesajın gönderilmesi için bekleniyor.
 
-            # "msg-time" ikonunun kaybolmasını bekle
-            WebDriverWait(driver, 300).until(
-                EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-            )
-
-            # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
-            sent_success_icon = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        f'(.//div[@role="row" and .//span[contains(text(), "{message}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                    # "msg-time" ikonunun bulmayı bekle
+                    WebDriverWait(driver, 300).until(
+                        EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
                     )
-                )
-            )
 
-            if sent_success_icon:
-                print("Mesaj başarılı bir şekilde gönderildi.")
-            else:
-                print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
-                raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                    # "msg-time" ikonunun kaybolmasını bekle
+                    WebDriverWait(driver, 300).until(
+                        EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+                    )
+
+                    # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
+                    sent_success_icon = WebDriverWait(driver, 300).until(
+                        EC.presence_of_element_located(
+                            (
+                                By.XPATH,
+                                f'(.//div[@role="row" and .//span[contains(text(), "{line}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                            )
+                        )
+                    )
+
+                    if sent_success_icon:
+                        print("Mesaj başarılı bir şekilde gönderildi.")
+                    else:
+                        print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                        raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
 
             return True, None
         except Exception as e:
@@ -371,35 +375,40 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
             print("Mesaj kutusu bulundu, mesaj gönderiliyor...")
-            msg_box.send_keys(message + Keys.ENTER)
-
-            # Mesajın gönderilmesi için bekleniyor.
             
-            # "msg-time" ikonunun bulmayı bekle
-            WebDriverWait(driver, 300).until(
-                EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-            )
+            for line in message.splitlines():
+                if line.strip():  # Satır boş değilse
+                
+                    msg_box.send_keys(line + Keys.ENTER)
 
-            # "msg-time" ikonunun kaybolmasını bekle
-            WebDriverWait(driver, 300).until(
-                EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
-            )
+                    # Mesajın gönderilmesi için bekleniyor.
 
-            # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
-            sent_success_icon = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        f'(.//div[@role="row" and .//span[contains(text(), "{message}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                    # "msg-time" ikonunun bulmayı bekle
+                    WebDriverWait(driver, 300).until(
+                        EC.visibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
                     )
-                )
-            )
 
-            if sent_success_icon:
-                print("Mesaj başarılı bir şekilde gönderildi.")
-            else:
-                print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
-                raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                    # "msg-time" ikonunun kaybolmasını bekle
+                    WebDriverWait(driver, 300).until(
+                        EC.invisibility_of_element_located((By.XPATH, '//span[@data-icon="msg-time"]'))
+                    )
+
+                    # Bu mesaj içinde 'msg-check' veya 'msg-dblcheck' ikonunu kontrol et
+                    sent_success_icon = WebDriverWait(driver, 300).until(
+                        EC.presence_of_element_located(
+                            (
+                                By.XPATH,
+                                f'(.//div[@role="row" and .//span[contains(text(), "{line}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                            )
+                        )
+                    )
+
+                    if sent_success_icon:
+                        print("Mesaj başarılı bir şekilde gönderildi.")
+                    else:
+                        print("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+                        raise Exception("mesajın hala bekliyor durumunda. zaman aşımından dolayı gönderilemedi.")
+
 
             return True, None
         except Exception as e:
@@ -1296,8 +1305,13 @@ def send_telegram_message(
             2. Use the following Python code to fetch the user's `chat_id`:
                 ```python
                 from telethon.sync import TelegramClient
+                import os
 
-                client = TelegramClient("my_telegram_session", "API_ID", "API_HASH")
+                # API kimlik bilgilerini yükle
+                api_id = os.getenv('MY_TELEGRAM_API_ID')
+                api_hash = os.getenv('MY_TELEGRAM_API_HASH')
+
+                client = TelegramClient("my_telegram_session", api_id, api_hash)
                 client.start()
 
                 for dialog in client.iter_dialogs():
@@ -1308,7 +1322,26 @@ def send_telegram_message(
 
             ##### For Groups:
             1. Add your Telegram account to the group.
-            2. use the same Python code above to fetch its numeric ID.      
+            2. use the similar Python code above to fetch its numeric ID.
+                  ```python
+                from telethon.sync import TelegramClient
+                import os
+
+                # API kimlik bilgilerini yükle
+                api_id = os.getenv('MY_TELEGRAM_API_ID')
+                api_hash = os.getenv('MY_TELEGRAM_API_HASH')
+
+                # Telegram istemcisini başlat
+                client = TelegramClient("my_telegram_session", api_id, api_hash)
+                client.start()
+
+                # Tüm diyalogları listele
+                for dialog in client.iter_dialogs():
+                    if dialog.is_group:  # Grup ID'lerini kontrol eder
+                        print(f"Group Name: {dialog.name}, Group ID: {dialog.id}")
+                    elif dialog.is_channel:  # Kanal ID'lerini kontrol eder
+                        print(f"Channel Name: {dialog.name}, Channel ID: {dialog.id}")
+                ```
             3. Look for the **negative numeric ID** corresponding to your group.
 
             ##### For Channels:
