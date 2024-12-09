@@ -198,6 +198,16 @@ A sender mail which used for sending mail
 "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
 A sender mail password which used for sending mail
 ```
+##### MS_COPILOT_EMAIL
+```
+"MS_COPILOT_EMAIL": "example@outlook.com"
+Your registered email for Microsoft Copilot.
+```
+##### MS_COPILOT_PASSWORD
+```
+"MS_COPILOT_PASSWORD*": "your-email-password"
+Your secure password for authentication.
+```
 
 # Setting up Environmental Variables
 

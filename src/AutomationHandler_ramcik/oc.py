@@ -42,7 +42,10 @@ from multiprocessing import Lock
 # iki tane tarayıcıda açmaya çalıştığın bozukluklar olması ve işlem yapılamaması
 whatsapp_lock = Lock()
 
-def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default: int = 1, headless: bool = False) -> webdriver:
+def create_webdriver_with_profile(chrome_profile_path: str = "", 
+                                  profile_default: int = 1, 
+                                  headless: bool = False, 
+                                  language: str = "en") -> webdriver:
     """
     Creates a WebDriver object using Chrome with a specified user profile.
 
@@ -56,6 +59,7 @@ def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default
             - 2 for secondary
             
         - headless (bool): Whether to run Chrome in headless mode. Defaults to False.
+        - language (str): Language for the browser. Defaults to "en" (English).
 
     - ### Environment Variables:
 
@@ -88,6 +92,8 @@ def create_webdriver_with_profile(chrome_profile_path: str = "", profile_default
     # Bu, tarayıcının belirtilen kullanıcı profili ile başlatılmasını sağlar.
     options.add_argument(f"user-data-dir={chrome_profile_path}")
 
+    # Tarayıcı dilini ayarlıyoruz.
+    options.add_argument(f"--lang={language}")
     
     options.add_argument('--disable-infobars')
 
@@ -278,7 +284,7 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
                     # Benzersiz bir marker oluştur 
                     unique_marker = to_custom_base5_with_unicode(random_number)
                     unique_line = line + unique_marker
-                    print(repr((unique_line)))
+                    #print(repr((unique_line)))
                     msg_box.send_keys(unique_line + Keys.ENTER)
 
                     # Mesajın gönderilmesi için bekleniyor.
@@ -298,7 +304,7 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
                         EC.presence_of_element_located(
                             (
                                 By.XPATH,
-                                f'(.//div[@role="row" and .//span[contains(text(), "{unique_marker}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                                f'(.//div[@role="row" and contains(string(.), "{unique_marker}")])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
                             )
                         )
                     )
@@ -392,7 +398,7 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
                     # Benzersiz bir marker oluştur 
                     unique_marker = to_custom_base5_with_unicode(random_number)
                     unique_line = line + unique_marker
-                    print(repr((unique_line)))
+                    #print(repr((unique_line)))
                     msg_box.send_keys(unique_line + Keys.ENTER)
 
                     # Mesajın gönderilmesi için bekleniyor.
@@ -412,7 +418,7 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
                         EC.presence_of_element_located(
                             (
                                 By.XPATH,
-                                f'(.//div[@role="row" and .//span[contains(text(), "{unique_marker}")]])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
+                                f'(.//div[@role="row" and contains(string(.), "{unique_marker}")])[last()]//span[@data-icon="msg-check" or @data-icon="msg-dblcheck"]'
                             )
                         )
                     )

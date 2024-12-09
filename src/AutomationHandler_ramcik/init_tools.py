@@ -88,7 +88,9 @@ def oc_create_myenvfile():
             "MY_TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
             "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
             "SENDER_EMAIL": "example_sender@gmail.com",
-            "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
+            "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password",
+            "MS_COPILOT_EMAIL": "your-email@outlook.com",
+            "MS_COPILOT_PASSWORD": "your-email-password"
         }
 
     if os.name == 'posix':
@@ -103,7 +105,9 @@ def oc_create_myenvfile():
             "MY_TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
             "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
             "SENDER_EMAIL": "example_sender@gmail.com",
-            "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
+            "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password",
+            "MS_COPILOT_EMAIL": "your-email@outlook.com",
+            "MS_COPILOT_PASSWORD": "your-email-password"
         }
     
     # Ensure the folder exists, create if not
