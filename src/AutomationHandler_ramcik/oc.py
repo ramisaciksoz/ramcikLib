@@ -149,8 +149,8 @@ def check_for_qr_code(driver: webdriver) -> bool:
                 EC.any_of(
                     EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                     EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']")),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Sohbetler']"))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                 )
             )
             
@@ -159,9 +159,9 @@ def check_for_qr_code(driver: webdriver) -> bool:
             if not qr_code_present:
                 qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")
             
-            profile_present = driver.find_elements(By.CSS_SELECTOR, "div[aria-label='Chats']")
+            profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Chats']")
             if not profile_present:
-                profile_present = driver.find_elements(By.CSS_SELECTOR, "div[aria-label='Sohbetler']")
+                profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Sohbetler']")
             
             if qr_code_present:
                 print("QR kodu yükleniyor.")
@@ -174,8 +174,8 @@ def check_for_qr_code(driver: webdriver) -> bool:
                 # QR kodu bulunca 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleme
                 profile_present = WebDriverWait(driver, 200).until(
                     EC.any_of(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Chats']")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[aria-label='Sohbetler']"))
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                     )
                 )
                 if profile_present:
