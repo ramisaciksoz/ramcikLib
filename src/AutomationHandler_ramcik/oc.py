@@ -3,33 +3,36 @@ from selenium.webdriver.common.by import By  # HTML elementlerini bulmak için k
 from selenium.webdriver.common.keys import Keys  # Klavye tuşlarını simüle etmek için kullanılır
 from selenium.webdriver.support.ui import WebDriverWait  # Belirli bir durumun gerçekleşmesini beklemek için kullanılır
 from selenium.webdriver.support import expected_conditions as EC  # Beklenen koşulları belirtmek için kullanılır
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import TimeoutException, InvalidArgumentException, JavascriptException
+from selenium.common.exceptions import NoSuchElementException # Belirtilen öğe bulunamazsa oluşan hata
+from selenium.common.exceptions import TimeoutException, InvalidArgumentException, JavascriptException  # Selenium hataları
+from selenium.webdriver.common.action_chains import ActionChains  # Fare ve klavye hareketlerini simüle etmek için kullanılır
 import time  # Zaman gecikmeleri için kullanılan kütüphane
 import os  # İşletim sistemi ile ilgili fonksiyonlar için kullanılan kütüphane
 import smtplib  # E-posta gönderme işlemleri için kullanılan kütüphane
 from email.mime.text import MIMEText  # E-posta içeriğini oluşturmak için kullanılır
 from email.mime.multipart import MIMEMultipart  # Birden fazla parçadan oluşan e-posta mesajları oluşturmak için kullanılır
-import traceback
+import traceback # Hata ayıklamak için kullanılır, istisnaların izini takip etmeye yarar
 from telethon import TelegramClient, sync  # sync modülü senkron çalışmayı sağlar
-from telethon.errors import PeerIdInvalidError
-from email.header import decode_header
-import requests
-from PIL import Image, ImageDraw
-import datetime
+from telethon.errors import PeerIdInvalidError  # Telegram'da geçersiz kullanıcı kimliği hatası
+from email.header import decode_header  # E-posta başlıklarını çözümlemek için kullanılır
+import requests  # HTTP istekleri yapmak için kullanılan kütüphane
+from PIL import Image, ImageDraw  # Görüntü işleme için kullanılan kütüphane
+import datetime  # Tarih ve saat işlemleri için kullanılır
 from google.cloud import vision  # Google Cloud Vision API'nin Python istemcisini içe aktarıyoruz.
 import io  # 'io' modülünü içe aktarıyoruz. Bu modül, dosya giriş/çıkışı işlemleri için kullanılır.
 import ssl  # Güvenli Bağlantı Katmanı (SSL) kütüphanesi
 from email import encoders  # E-posta ekini kodlama modülü
 from email.mime.base import MIMEBase  # E-posta eki oluşturma modülü
-import cv2
-import numpy as np
-import pyautogui
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from telethon.tl.functions.contacts import ImportContactsRequest
-from telethon.tl.types import InputPhoneContact
-import random
-### whatsapp'a linkle giriş eklenecek qr kod gibi
+import cv2  # OpenCV ile görüntü işleme
+import numpy as np  # Sayısal işlemler ve diziler için kullanılan kütüphane
+import pyautogui  # Ekran otomasyonu ve fare hareketleri için kullanılan kütüphane
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities  # WebDriver yeteneklerini belirlemek için kullanılır
+from telethon.tl.functions.contacts import ImportContactsRequest  # Telegram'da kişi ekleme işlemi için kullanılan API fonksiyonu
+from telethon.tl.types import InputPhoneContact  # Telegram'a telefon numarası eklemek için kullanılır
+import random  # Rastgele sayı üretmek için kullanılan kütüphane
+from email.header import Header
+import re
+from selenium.common.exceptions import StaleElementReferenceException
 ### sms atma fonksiyonu
 
 
@@ -112,47 +115,192 @@ def create_webdriver_with_profile(chrome_profile_path: str = "",
     driver = webdriver.Chrome(options=options)
     return driver
 
-
-
-def check_for_qr_code(driver: webdriver) -> bool:
+def log_in_with_link(phone_country_code: str ,phone_number: str, receiver_email: str, driver: webdriver) -> bool:
     """
-    Checks if the WhatsApp Web page is requesting a QR code scan or if the user is already logged in.
-    
-    This function opens the WhatsApp Web page using the provided Selenium WebDriver instance.
-    It waits for either a QR code prompt or the Chats screen to appear.
-    
+    Logs into WhatsApp Web using a phone number authentication link.
+
+    This function automates the login process for WhatsApp Web by selecting the phone number login method, 
+    entering the country code and phone number, and retrieving the verification code sent by WhatsApp.
+
     - ### Parameters:
 
-        driver (Webdriver): A Selenium Webdriver instance for interacting with WhatsApp Web.
+        - phone_country_code (str): The country code of the phone number (e.g., "+1" for the US).
+        - phone_number (str): The phone number to be used for login.
+        - receiver_email (str): The email address where the verification code will be sent.
+        - driver (webdriver): A Selenium WebDriver instance for interacting with WhatsApp Web.
 
     - ### Returns:
 
-        bool: - True if QR code is present (needs scan) or no elements found.
-              - False if already logged in (Chats screen).
+        bool: 
+            - True if the login process successfully retrieves the verification code and sends it via email.
+            - False if any step in the process fails.
 
     - ### Notes:
     
-        - If a QR code is found, the function waits up to 200 seconds for the user to scan the code 
-          and log in. If the profile page (Chats screen) appears within that time, it returns False, 
-          indicating successful login.
+        - The function retries steps multiple times in case of failures (e.g., missing elements, 
+          slow page loads, or network delays).
+        - It ensures that the WebDriver session is refreshed if necessary and attempts multiple methods 
+          to locate required elements.
+    """
+    max_attempts = 3
+    attempt = 0
+
+    while attempt < max_attempts:
+        try:
+
+            finding_link = WebDriverWait(driver, 300).until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Log in with phone number')]")),
+                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefon numarası kullanarak giriş yapın')]"))
+                )
+            )
+
+            finding_link.click()
+            # Butonu bul ve tıkla
+            button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[.//div[text()='United States']]"))
+            )
+            button.click()
+            break
+        except:
+            attempt += 1
+            driver.refresh()
+            time.sleep(3)
+
+    if attempt == max_attempts:
+        return False
         
-        - If no QR code or profile screen is detected, the function returns False as a fallback.
-        """
+
+    attempt0 = 0
+    max_attempts0 = 3
+    while attempt0 < max_attempts0:
+        try:
+            # İlk yöntemi dene: Direkt role="textbox" olan elementi bul
+            textbox = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@role='textbox']"))
+            )
+            print("Textbox role ile bulundu!")
+        except:
+            try:
+                # İlk yöntem başarısız olursa ikinci yöntemi dene: data-icon='search' kullanarak textbox'ı bul
+                textbox = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, "//span[@data-icon='search']/ancestor::div/following-sibling::div//div[@role='textbox']")
+                    )
+                )
+                print("Textbox data-icon yöntemiyle bulundu!")
+            except Exception as e:
+                print(f"Textbox bulunamadı! Hata: {e}")
+                textbox = None  # Textbox bulunamazsa None olarak bırak
+                return False
+
+        # Eğer textbox bulunduysa içine metni yaz
+        if textbox:
+            try:
+                textbox.send_keys(phone_country_code)
+                print("phone_country_code başarıyla yazıldı!")
+            except Exception as e:
+                print(f" phone_country_code yazılamadı! Hata: {e}")
+                return False
+    
+
+def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_number: str = None, receiver_email: str = None) -> bool:
+    """
+    Checks if WhatsApp Web requires authentication and waits for a QR code scan manually or attempts login via email verification if phone number, phone country code, and email are provided.
+    
+    This function opens WhatsApp Web using the provided Selenium WebDriver instance and waits for one of the following:
+    - If the user is already logged in, it detects the chat screen and returns `False`.
+    - If login is required and the parameters `phone_country_code`, `phone_number`, and `receiver_email` are provided,
+      the function attempts to log in via a verification code sent to the given email.
+    - If no login parameters are provided, it waits for a QR code to be scanned manually.
+    
+    ### Parameters:
+    - **driver** (*WebDriver*): A Selenium WebDriver instance used to interact with WhatsApp Web.
+    - **phone_country_code** (*str, optional*): The country code of the phone number to be used for login with an email-based verification code.
+    - **phone_number** (*str, optional*): The phone number associated with the WhatsApp account.
+    - **receiver_email** (*str, optional*): The email address where the verification code will be sent if logging in via email.
+    
+    ### Returns:
+    - **bool**:
+      - `True`: If a QR code is present and needs to be scanned for login.
+      - `False`: If the user is already logged in and the chat screen is displayed.
+      - `-1`: If neither the QR code nor the chat screen could be found.
+      - `-2`: If an error occurs during execution.
+    
+    ### Notes:
+    - If a QR code is detected, the function waits up to **200 seconds** for the user to scan it and log in.
+    - If **phone_country_code, phone_number, and receiver_email** are provided, an email-based login method is attempted instead of QR scanning.
+    - If the chat screen appears within the waiting period, it returns `False`, indicating a successful login.
+    - If no expected elements are found, the function returns `-1` as a fallback.
+    """
+
     
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         try:
             # Web sayfasını aç
             driver.get("https://web.whatsapp.com")
-            
-            # QR kodunu veya profil ekranını aynı anda bekle
-            WebDriverWait(driver, 300).until(
-                EC.any_of(
-                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
-                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
+            prev_percentage = None  # İlk yüzde değerini saklamak için
+
+            while True:
+                # QR kodunu veya profil ekranını aynı anda bekle
+                element = WebDriverWait(driver, 300).until(
+                    EC.any_of(
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']")),
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Loading your chats')]")),
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Sohbetler yükleniyor')]"))
+                    )
                 )
-            )
+                text = element.text.strip()
+                if "Loading your chats" in text or "Sohbetler yükleniyor" in text:
+                    match = re.search(r"\[(\d+)%\]", text)  # Yüzde işaretinden sonraki sayıyı al
+                    if match:
+                        current_percentage = int(match.group(1))
+                        print(f"Mevcut yüklenme yüzdesi: {current_percentage}%")
+
+                        # İlk defa yüzdeyi bulursa `prev_percentage` olarak ata
+                        if prev_percentage is None:
+                            prev_percentage = current_percentage
+                            try:
+                                WebDriverWait(driver, 300).until(
+                                    EC.any_of(
+                                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
+                                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
+                                    )
+                                )
+                                break # Mesajlar yüklendi döngüden çık
+                            except:  # Eğer element bulunamadıysa hata mesajı ver ve döngüden çık
+                                pass
+
+                            continue
+                        
+                        # Eğer ilerleme varsa beklemeye devam et
+                        if current_percentage > prev_percentage:
+                            prev_percentage = current_percentage  # Yeni yüzdeyi kaydet
+                            try:
+                                WebDriverWait(driver, 300).until(
+                                    EC.any_of(
+                                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
+                                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
+                                    )
+                                )
+                                break # Mesajlar yüklendi döngüden çık
+                            except:  # Eğer element bulunamadıysa hata mesajı ver ve döngüden çık
+                                pass
+                            continue  # Döngüye devam et
+
+                        else:
+                            print("Bir sebepten dolayı İlerleme durdu.")
+                            return -3 # Eğer ilerleme yoksa hata kodu döndür 
+
+                else:
+                    break
             
             # QR kodu varsa true, profil ekranı varsa false döndür
             qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Open WhatsApp on your phone')]")
@@ -169,7 +317,18 @@ def check_for_qr_code(driver: webdriver) -> bool:
                 WebDriverWait(driver, 100).until(
                     EC.presence_of_element_located((By.XPATH, "//*[@aria-label='Scan this QR code to link a device!']"))
                 )
-                print("QR kodu resmi yüklendi, 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleniyor. Eğer giriş yaparsan program devam edecek, yapmazsan da kapanacak.")
+
+                condition = phone_country_code and phone_number and receiver_email
+                if condition:    
+                    print(f"Whatsapp'ınıza giriş yapabilmeniz için doğrulama kodu, {receiver_email} hesabına 'Whatsapp Doğrulama Kodu' konulu mail olarak gönderiliyor...")
+                    log_in = log_in_with_link(phone_country_code, phone_number, receiver_email, driver)
+                    print(f"Doğrulama kodu, {receiver_email} hesabına 'Whatsapp Doğrulama Kodu' konulu mail olarak gönderildi, 200 saniye de Doğrulama kodunu ile Whatsapp'a giriş yapman için bekleniyor. Eğer giriş yaparsan program devam edecek, yapmazsan da kapanacak.")
+                    
+                    if not log_in:
+                        send_email("log_in with_link hatası", "log_in with_link fonksiyonunda hata var")
+                        print("WhatsApp'a girişte hata oluştu lütfen yetkiliyle iletişime geçin.")
+                else:
+                    print("QR kodu resmi yüklendi, 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleniyor. Eğer giriş yaparsan program devam edecek, yapmazsan da kapanacak.")
                 
                 # QR kodu bulunca 200 saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleme
                 profile_present = WebDriverWait(driver, 200).until(
@@ -209,7 +368,98 @@ def check_for_qr_code(driver: webdriver) -> bool:
             # traceback.print_exc()  # Ayrıntılı hata mesajı
             return -2  # Hata durumu
 
+def __search_and_select_chat(someone_or_group_name, driver):
+    """
+    Searches for a chat in WhatsApp Web using Selenium and selects it if found.
 
+    Parameters:
+        driver (WebDriver): An instance of Selenium WebDriver.
+        someone_or_group_name (str): The exact name of the chat (person or group) to search for.
+
+    Returns:
+        bool: True if the chat is found and selected, False otherwise.
+
+    Behavior:
+        - Opens the WhatsApp search box and enters the given name.
+        - Waits for search results to appear.
+        - If an exact match is found, selects the first result and returns True.
+        - If no exact match, looks for a partial match (title contains the search term) and selects the first result.
+        - If no relevant result is found, returns False.
+    """
+
+    try:
+        # Arama kutusunu bul ve ismi gir
+        search_box = WebDriverWait(driver, 100).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+        )
+        search_box.click()
+        search_box.send_keys(someone_or_group_name)
+
+        # Eğer giriş yalnızca sayılardan oluşuyorsa veya '+' ile başlayıp sayılar içeriyorsa direkt Enter bas
+        if someone_or_group_name.isdigit() or (someone_or_group_name.startswith("+") and someone_or_group_name[1:].isdigit()):
+            search_box.send_keys(Keys.ENTER)
+            # Mesaj kutusunun yüklenmesini bekleyin
+            msg_box = WebDriverWait(driver, 100).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+
+            if msg_box:
+                return True # Böyle bir sohbet bulundu
+                
+            else:
+                print("Böyle bir sohbet bulunamadı") 
+                return False  # Böyle bir sohbet bulunamadı
+    except:
+        return False  # Arama kutusu bulunamadı
+
+    try:
+        # Arama sonuçlarını bekle
+        WebDriverWait(driver, 100).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Search results.']//span[@dir='auto']"))
+        )
+    except:
+        return False  # Arama sonuçları bulunamadı
+
+    # Elementler değişmiş olabilir, tekrar alalım
+    for _ in range(3):  # 3 kere deneyecek
+        try:
+            results = driver.find_elements(By.XPATH, "//div[@aria-label='Search results.']//span[@dir='auto']")
+            if results:
+                break  # Sonuçları başarılı şekilde aldıysa döngüyü kır
+        except StaleElementReferenceException:
+            continue  # Eğer element kaybolduysa tekrar dene
+
+    if results:
+        # Tam eşleşme kontrolü
+        for r in results:
+            try:
+                if r.get_attribute("title") == someone_or_group_name:
+                    r.click()
+                    print("Tam eşleşme bulundu ve seçildi")
+                    return True  # Tam eşleşme bulundu ve seçildi
+            except StaleElementReferenceException:
+                continue  # Eğer element geçersiz olduysa diğerlerine bak
+
+        # İçerenleri kontrol et
+        for r in results:
+            try:
+                if someone_or_group_name in r.get_attribute("title"):
+                    r.click()
+                    print("Kısmi eşleşme bulundu ve seçildi")
+                    return True  # Kısmi eşleşme bulundu ve seçildi
+            except StaleElementReferenceException:
+                continue  # Eğer element kaybolduysa diğerlerine bak
+
+    # 'No chats, contacts or messages found' kontrolü
+    no_results_element = WebDriverWait(driver, 100).until(
+        EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'No chats, contacts or messages found')]"))
+    )
+    if no_results_element:
+        print("Böyle bir sohbet bulunamadı")
+        return False  # Böyle bir sohbet bulunamadı
+
+    print("Beklenmeyen bir durum oluştu")
+    return False  # Beklenmeyen bir durum oluştu
 
 def send_message_to_number(phone_number: str, message: str, driver: webdriver) -> tuple[bool, Exception | None]:
     """
@@ -261,13 +511,9 @@ def send_message_to_number(phone_number: str, message: str, driver: webdriver) -
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         # kişi adına göre kişiyi bulma ve tıklama
         try:
-            search_box = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-            )
-            search_box.click()
-            search_box.send_keys(phone_number)
-            search_box.send_keys(Keys.RETURN)
-            print("kişi bulundu ve açılıyor")
+
+            if __search_and_select_chat(phone_number, driver):
+                print("kişi bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
             msg_box = WebDriverWait(driver, 300).until(
@@ -375,13 +621,9 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         # Grup adına göre grubu bulma ve tıklama
         try:
-            search_box = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-            )
-            search_box.click()
-            search_box.send_keys(someone_or_group_name)
-            search_box.send_keys(Keys.RETURN)
-            print("Grup bulundu ve açılıyor")
+
+            if __search_and_select_chat(someone_or_group_name, driver):
+                print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
             msg_box = WebDriverWait(driver, 300).until(
@@ -495,13 +737,9 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         # Grup adına göre grubu bulma ve tıklama
         try:
-            search_box = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-            )
-            search_box.click()
-            search_box.send_keys(someone_or_group_name)
-            search_box.send_keys(Keys.RETURN)
-            print("Grup bulundu ve açılıyor")
+            
+            if __search_and_select_chat(someone_or_group_name, driver):
+                print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
             msg_box = WebDriverWait(driver, 300).until(
@@ -837,14 +1075,10 @@ def get_last_message(phone_number: str, driver: webdriver) -> str | None:
     
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         try:
+
             # kişi adına göre kişiyi bulma ve tıklama
-            search_box = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-            )
-            search_box.click()
-            search_box.send_keys(phone_number)
-            search_box.send_keys(Keys.RETURN)
-            print("Grup bulundu ve açılıyor")
+            if __search_and_select_chat(phone_number, driver):
+                print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
             msg_box = WebDriverWait(driver, 300).until(
@@ -933,14 +1167,10 @@ def get_whatsapp_chat_history(phone_number: str, driver: webdriver) -> list[str]
     
     with whatsapp_lock:  # Kilidi kullanarak işlem yap
         try:
+            
             # kişi adına göre kişiyi bulma ve tıklama
-            search_box = WebDriverWait(driver, 300).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
-            )
-            search_box.click()
-            search_box.send_keys(phone_number)
-            search_box.send_keys(Keys.RETURN)
-            print("Grup bulundu ve açılıyor")
+            if __search_and_select_chat(phone_number, driver):
+                print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
             msg_box = WebDriverWait(driver, 300).until(
@@ -1170,7 +1400,7 @@ def send_email_with_attachments(subject: str, body: str, attachment_files: list,
     msg = MIMEMultipart()  # MIMEMultipart kullanarak çok parçalı bir e-posta oluştur
     msg['From'] = from_email  # Gönderenin e-posta adresini belirle
     msg['To'] = receiver_email  # Alıcının e-posta adresini belirle
-    msg['Subject'] = subject  # E-postanın konusunu belirle
+    msg['Subject'] = Header(subject, 'utf-8')  # E-postanın konusunu belirle
 
     try:
         # Check if error_data is not a string and convert it to a string if necessary
