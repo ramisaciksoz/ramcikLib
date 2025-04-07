@@ -37,6 +37,7 @@ from telethon import functions  # Telegram API'nin gelişmiş fonksiyonlarını 
 import unicodedata  # Unicode karakterlerin normalleştirilmesi (örn. aksan temizliği) için kullanılır
 import undetected_chromedriver as uc  # Chrome tarafından tespit edilmeden Selenium kullanmak için özel WebDriver
 import pyperclip  # Panoya (clipboard) metin kopyalayıp yapıştırmak için kullanılır
+import json
 
 ### sms atma fonksiyonu
 
@@ -449,7 +450,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Loading your chats')]")),
-                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Sohbetler yükleniyor')]")),
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Sohbetleriniz yükleniyor')]")),
                         EC.presence_of_element_located((By.XPATH, '//div[text()="Syncing chats..."]')),
                         EC.presence_of_element_located((By.XPATH, '//div[text()="Sohbetler senkronize ediliyor..."]')),
                         EC.presence_of_element_located((By.XPATH, '//div[text()="Sohbetler eşitleniyor..."]'))
@@ -659,7 +660,7 @@ def __search_and_select_chat(someone_or_group_name, driver, timeout: int = 100):
     try:
         # Arama kutusunu bul ve ismi gir
         search_box = WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
+            EC.element_to_be_clickable((By.XPATH, "//div[@contenteditable='true'][@data-tab='3']"))
         ) 
         search_box.click()
         search_box.send_keys(Keys.CONTROL, "a") # Tüm metni seç
@@ -671,7 +672,7 @@ def __search_and_select_chat(someone_or_group_name, driver, timeout: int = 100):
             search_box.send_keys(Keys.ENTER)
             # Mesaj kutusunun yüklenmesini bekleyin
             msg_box = WebDriverWait(driver, timeout).until(
-                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+                EC.element_to_be_clickable((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
             )
 
             if msg_box:
@@ -686,7 +687,11 @@ def __search_and_select_chat(someone_or_group_name, driver, timeout: int = 100):
     try:
         # Arama sonuçlarını bekle
         WebDriverWait(driver, timeout).until(
-            EC.presence_of_all_elements_located((By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']"))
+            lambda d: any(
+                span.is_displayed() and
+                EC.element_to_be_clickable(span.find_element(By.XPATH, "./ancestor::div[@role='listitem']"))(d)
+                for span in d.find_elements(By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']")
+            )
         )
     except:
         return False  # Arama sonuçları bulunamadı
@@ -818,10 +823,27 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
 
             formatted_message = format_text_for_input(unique_line)
             #print(repr((formatted_message)))
-            msg_box.send_keys(Keys.CONTROL, 'v')
+            driver.execute_script("""
+                const textarea = arguments[0];
+                const text = arguments[1];
+                textarea.focus();
+
+                const dataTransfer = new DataTransfer();
+                dataTransfer.setData('text', text);
+
+                const event = new ClipboardEvent('paste', {
+                    clipboardData: dataTransfer,
+                    bubbles: true
+                });
+
+                textarea.dispatchEvent(event);
+            """, msg_box, formatted_message)
+
+            # Odaklan ve Enter'a bas
+            msg_box.send_keys(Keys.SPACE)  # Trigger içerik algılaması için küçük bir tuş
             msg_box.send_keys(Keys.ENTER)
 
-
+            
             # Mesajın gönderilmesi için beklemmeye başlanıyor.
 
             # "msg-time" ikonunun bulmayı bekle
@@ -1134,7 +1156,7 @@ def notify_phone_number(
         if chrome_profile_path == "":
             raise ValueError("Profil yolu sağlanmadı ve ortam değişkenleri ayarlanmadı. ikisinden biri yapılmalı.")
 
-    driver = create_webdriver_with_profile(chrome_profile_path, headless = headless, timeout = timeout)
+    driver = create_webdriver_with_profile(chrome_profile_path, headless = headless)
     
     # QR kod var mı diye Fonksiyonu test etme varsa işlemlerin gerisini yapmadan bana uyarı E-maili atacak.
     qr_exists = check_for_qr_code(driver, phone_country_code=my_phone_country_code, phone_number=my_phone_number, receiver_email=my_receiver_email, timeout=timeout)
@@ -1149,7 +1171,7 @@ def notify_phone_number(
     
     # Yoksa wpweb'deki benim mesajlarıma erişmiş demektir.
     else:
-        check_sending, e = send_message_to_someone_or_group(someone_or_group_name, message, driver)
+        check_sending, e = send_message_to_someone_or_group(someone_or_group_name, message, driver, timeout = timeout)
         driver.quit()  # Driver'ı kapat
 
         #bir önceki satır false ise yani gönderilemediyse alttaki satırı çalıştır.
@@ -2894,6 +2916,50 @@ def format_text_for_input(prompt, retries=5, delay=0.2, verbose=True):
     return formatted_prompt
 
 
+def extract_all_json_blocks(text: str) -> list:
+    """
+    Extract all valid JSON objects and arrays from a given text string.
+
+    This function looks for potential JSON blocks within the text, either objects ({...}) 
+    or arrays ([...]). It tries to parse each match using the `json` module and returns 
+    a list of successfully parsed JSON structures.
+
+    Args:
+        text (str): The full text content that may contain JSON data and other content.
+
+    Returns:
+        list: A list of parsed JSON objects or arrays. Invalid or malformed JSON parts 
+              are silently skipped.
+
+    Example:
+        input_text = '''
+            Info before JSON...
+            {"name": "Alice", "age": 25}
+            Some list: [1, 2, {"item": "value"}]
+            Broken JSON: {missing: quotes}
+        '''
+
+        result = extract_all_json_blocks(input_text)
+        print(result)
+        # Output: [{'name': 'Alice', 'age': 25}, [1, 2, {'item': 'value'}]]
+    """
+
+    # Regex to match JSON objects or arrays
+    pattern = r'(\{(?:[^{}[\]]|(?R))*\}|\[(?:[^\[\]{}]|(?R))*\])'
+    matches = re.findall(pattern, text)
+
+    results = []
+    for match in matches:
+        try:
+            parsed = json.loads(match)
+            results.append(parsed)
+        except json.JSONDecodeError:
+            pass  # Skip if invalid JSON
+
+    return results
+
+
+
 ##################### Cloudflare ve Bot Tespitine Duyarlı Tarayıcı Açma Araçları ############################
 
 
@@ -3107,121 +3173,307 @@ def check_previous_block_status(block_file_path):
 ##################### Yapay zeka fonksiyomları ############################
 
 #### ChatGPT ####
+class ChatGPT:
+    """
+    A utility class to automate interaction with ChatGPT web UI using Selenium WebDriver.
 
-def __find_next_conversation_turn(target_text, driver , timeout=300):
-    wait = WebDriverWait(driver, timeout)
+    Attributes:
+        driver (selenium.webdriver): A Selenium WebDriver instance with ChatGPT loaded.
+    """
+    def __init__(self, config_path="browser_config.json"):
+        self.driver = None
 
-    try:
-        # Tüm conversation-turn elementlerini bul
-        all_turns = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, '[data-testid^="conversation-turn-"]'))
-        )
+    def set_driver(self, driver):
+        self.driver = driver
+        print("Driver injected successfully.")
 
-        # Hedef metni içeren ilk conversation-turn'ü bul
-        matching_elem = None
-        for elem in all_turns:
-            if target_text in elem.text:
-                matching_elem = elem
-                break
+    def __find_next_conversation_turn(self ,target_text, timeout=300):
+        """
+        Finds the assistant's response element that directly follows a specific user prompt
+        in a ChatGPT conversation, based on the 'data-testid' convention used in the DOM.
 
-        if not matching_elem:
-            print("Hedef metni içeren conversation-turn bulunamadı.")
-            return None
+        This function works by:
+        - Searching all elements with data-testid starting with 'conversation-turn-'.
+        - Locating the first element whose text contains the given target prompt.
+        - Parsing its data-testid to extract its numeric order (e.g., conversation-turn-17).
+        - Calculating the next turn (e.g., conversation-turn-18).
+        - Waiting for the assistant's response in that next element.
+        - Ensuring the assistant's reply is fully loaded by waiting for the 'Read aloud' button.
 
-        data_testid = matching_elem.get_attribute("data-testid")
+        Args:
+            target_text (str): The exact prompt previously sent to ChatGPT that we are tracking.
+            timeout (int): Max wait time in seconds. Default is 300.
+
+        Returns:
+            tuple(WebElement, str) or (None, None): 
+                The assistant's response element and its testid, or (None, None) if not found.
+        """
+        if not self.driver:
+            raise RuntimeError("Driver is not set. Call set_driver(driver) first.")
+
+        wait = WebDriverWait(self.driver, timeout)
+
+        try:
+            # Tüm conversation-turn elementlerini bul
+            all_turns = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, '[data-testid^="conversation-turn-"]'))
+            )
+
+            # Hedef metni içeren ilk conversation-turn'ü bul
+            matching_elem = None
+            for elem in all_turns:
+                if target_text in elem.text:
+                    matching_elem = elem
+                    break
+
+            if not matching_elem:
+                print("Target prompt not found in any conversation turn.")
+                return None, None
+
+            data_testid = matching_elem.get_attribute("data-testid")
+            
+
+            match = re.search(r"conversation-turn-(\d+)", data_testid)
+            if not match:
+                print(f"Invalid data-testid format: {data_testid}")
+                return None, None
+
+            next_index = int(match.group(1)) + 1
+            next_testid = f"conversation-turn-{next_index}"
+            
+            
+            # Sonraki elementi bekle ve yakala
+            next_elem = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, f'[data-testid="{next_testid}"]'))
+            )
+            response_element = next_elem.find_element(By.CSS_SELECTOR, '[data-message-author-role="assistant"]')
+
+
+            print("Waiting for assistant's reply...")
+
+            # Wait for either the 'I prefer this response' button or the 'Read aloud' button to appear
+            wait.until(
+                EC.any_of(
+                    EC.presence_of_element_located((
+                        By.XPATH,
+                        f'//*[@data-testid="{next_testid}"]//button[@data-testid="paragen-prefer-response-button"]'
+                    )),
+                    EC.presence_of_element_located((
+                        By.XPATH,
+                        f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
+                    ))
+                )
+            )
+
+            # If the 'I prefer this response' button exists, click it, then wait for the 'Read aloud' button to load
+            prefer_button = next_elem.find_element(By.XPATH, './/button[@data-testid="paragen-prefer-response-button"]')
+            if prefer_button:
+                prefer_button.click()
+
+                wait.until(
+                    EC.presence_of_element_located((
+                        By.XPATH,
+                        f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
+                    ))
+                )
+            
+            print("Assistant's reply detected.")
+
+            next_elem = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, f'[data-testid="{next_testid}"]'))
+            )
+
+            response_element = next_elem.find_element(By.CSS_SELECTOR, '[data-message-author-role="assistant"]')
+
+            return response_element, next_testid 
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return None, None
+
+
+    def __check_error(self, testid_number: int):
+        """
+        Checks whether a ChatGPT response contains an error message.
+
+        After sending a prompt to ChatGPT, each response is rendered inside an element 
+        with a dynamic `data-testid="conversation-turn-{testid_number}"` attribute.
+
+        This function locates that specific conversation turn and checks if it contains 
+        a child element with the class `bg-token-surface-error`, which indicates that 
+        an error occurred during the response.
+
+        Args:
+            testid_number (int): The response turn number, used to build the data-testid.
+
+        Returns:
+            str | bool: Returns the error message text if found, otherwise False.
+
+        Example:
+            error_text = check_chatgpt_error(24, driver)
+            if error_text:
+                print("ChatGPT Error:", error_text)
+            else:
+                print("Response is clean.")
+        """
+        if not self.driver:
+            raise RuntimeError("Driver is not set. Call set_driver(driver) first.")
         
+        test_id = f"conversation-turn-{testid_number}"
+        try:
+            parent_el = self.driver.find_element(By.CSS_SELECTOR, f'[data-testid="{test_id}"]')
+            error_el = parent_el.find_element(By.CLASS_NAME, 'bg-token-surface-error')
+            return error_el.text.strip()
+        except NoSuchElementException:
+            return False
 
-        match = re.search(r"conversation-turn-(\d+)", data_testid)
-        if not match:
-            print(f"data-testid formatı geçersiz: {data_testid}")
-            return None
 
-        next_index = int(match.group(1)) + 1
-        next_testid = f"conversation-turn-{next_index}"
+    def send_prompt_with_response_format(
+        self,
+        prompt: str,
+        output_format: str = None,
+        chat_url: str = None,
+        timeout: int = 300
+    ) -> str | None:
+
+        """
+        Sends a prompt to ChatGPT through an active Selenium WebDriver session.
+
+        This function optionally navigates to a specific chat URL before sending the prompt, 
+        and supports formatting the response with a given style such as raw string, JSON, or YAML.
+
+
+        Functionality:
+        - Navigates to `chat_url` if provided, otherwise uses the current page.
+        - Appends a formatting instruction to the original prompt to enforce plain text output.
+        - Prepares the final prompt string using a helper function `format_text_for_input(prompt: str)`.
+        - Waits for the prompt input field (`#prompt-textarea`) to become available.
+        - Simulates human-like interaction by:
+            - Random sleep before sending
+            - Using clipboard-based paste (CTRL+V)
+            - Submitting the prompt with ENTER
+
+        Args:
+            prompt (str): The original user prompt to send to ChatGPT.
+            output_format (str, optional): Optional format instruction to guide the response style. If provided,
+                                        it will be appended to the prompt before the default raw string instruction.
+            chat_url (str, optional): If provided, navigates to this specific ChatGPT conversation before sending the prompt.
+            timeout (int, optional): Maximum time to wait (in seconds) for the prompt input element to appear. Default is 300 seconds.
+
+        Returns:
+            formatted_prompt (str): The final formatted prompt that was actually sent to ChatGPT, including 
+                                    the added instruction for plain text response and any formatting applied.
+            None: If an error occurs during the sending process, None is returned.
+
+        Notes:
+            - The function assumes that ChatGPT is already loaded and the user is logged in.
+            - The function relies on a helper called `format_text_for_input(prompt: str)` 
+            which prepares the prompt for pasting via clipboard (e.g., copying to clipboard beforehand).
+            - This function does not read or return the actual response from ChatGPT; it only sends the prompt.
+            - The output_format parameter allows flexible control over the desired structure of the response
+            (e.g., JSON, YAML, CLI-style, raw string, etc.).
+            - If `chat_url` belongs to a different account or device, make sure the link is publicly accessible or shared as a universal chat link. 
+            Otherwise, ChatGPT may not load the conversation properly.
+            
+        Example usage:
+            >>> formatted = send_prompt_for_text_response("What is quantum entanglement?", driver)
+            >>> print(formatted)
+            "What is quantum entanglement? Return the answer as a raw string, just give answer"
+        """
+
+        try:
+            if not self.driver:
+                raise RuntimeError("Driver is not set. Call set_driver(driver) first.")
+            
+            if chat_url:
+                self.driver.get(chat_url)
+                print(f"Navigated to chat URL: {chat_url}")
+
+            # Wait until the prompt input field is visible and ready
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.ID, "prompt-textarea"))
+            )
+            time.sleep(random.uniform(2, 4))  # Mimic human-like delay
+            print("Sending prompt...")
+
+            # Find the input field
+            prompt_element = self.driver.find_element(By.ID, "prompt-textarea")
+
+            # Append optional formatting instruction if provided
+            if output_format:
+                prompt += output_format
+            
+            # Append default raw string instruction to ensure clean output
+            prompt += "Return the answer as a raw string, just give answer"
+
+            # Prepare the final string for clipboard pasting
+            formatted_prompt = format_text_for_input(prompt)
+
+            # Paste and submit the prompt
+            prompt_element.send_keys(Keys.CONTROL, 'v')
+            prompt_element.send_keys(Keys.ENTER)
+
+            print("Prompt sent.")
+
+            return formatted_prompt
         
-        
-        # Sonraki elementi bekle ve yakala
-        next_elem = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, f'[data-testid="{next_testid}"]'))
-        )
-        response_element = next_elem.find_element(By.CSS_SELECTOR, '[data-message-author-role="assistant"]')
+        except Exception as e:
+            print("Error occurred:")
+            print(str(e))
 
-        print("cevap bekleniyor")
-        wait.until(
-            EC.presence_of_element_located((
-                By.XPATH,
-                f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
-            ))
-        )
-        print("cevap geldi")
-
-        next_elem = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, f'[data-testid="{next_testid}"]'))
-        )
-
-        response_element = next_elem.find_element(By.CSS_SELECTOR, '[data-message-author-role="assistant"]')
-
-        return response_element
-
-    except Exception as e:
-        print(f"Hata oluştu: {e}")
         return None
 
+    def get_formatted_response(self, prompt, timeout: int = 300):
+        """
+        Retrieves the assistant's response element following a given user prompt from a ChatGPT conversation,
+        and returns its text content in the format provided by the assistant (e.g., a raw string, JSON, YAML).
 
-def get_text_response_from_chatgpt(prompt, driver):
-    """
-    Sends a prompt to ChatGPT and retrieves the response as plain text only.
-    - Adds an instruction to the prompt to request a plain text response.
-    - Formats the prompt for clipboard paste.
-    - Sends the prompt via CTRL+V to avoid send_keys issues with large or multiline input.
-    - Waits for and returns the plain text response.
+        This function:
+        - Locates the prompt in the chat history by matching its text content.
+        - Identifies the following assistant reply element based on conversation turn order.
+        - Waits for the assistant's full response to be rendered (using 'Read aloud' indicator).
+        - Checks for any error states in the response container.
+        - Returns the full text content of the assistant's reply element.
 
-    Args:
-        prompt (str): The original prompt/question to ask ChatGPT.
+        Args:
+            prompt (str): The prompt string that was previously submitted to ChatGPT.
+            timeout (int, optional): Maximum wait time in seconds for required elements to appear. Default is 300 seconds.
 
-    Returns:
-        str or None: The plain text response if available, otherwise None.
-    """
-    try:
-        # Sayfa tamamen yüklenene kadar bekle
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "prompt-textarea"))
-        )
-        time.sleep(random.uniform(2, 4))  # İnsan gibi bekleme
-        print("Prompt gönderiliyor...")
+        Returns:
+            str or None: The full text content of the assistant's response (raw string or formatted), or None if an error occurs.
+        """
 
-        # Prompt input alanını bul
-        prompt_element = driver.find_element(By.ID, "prompt-textarea")
+        if not self.driver:
+            raise RuntimeError("Driver is not set. Call set_driver(driver) first.")
 
-        # Prompt'a düz metin cevabı istendiğini ekle
-        prompt += " Give the answer as plain text only, do not use code blocks. just string"
-
-        # Yapıştırmaya uygun hale getir
-        formatted_prompt = format_text_for_input(prompt)
-
-        # Input alanına yapıştır ve Enter'a bas
-        prompt_element.send_keys(Keys.CONTROL, 'v')
-        prompt_element.send_keys(Keys.ENTER)
-
-        print("Prompt gönderildi, cevap bekleniyor...")
-
-        # Yanıtın geldiği alanı bulmak için bekle
-        response_element = __find_next_conversation_turn(formatted_prompt, driver, timeout=300)
-
-        if response_element.text:
-            response = response_element.text.strip()
-            if response:
-                print("Yanıt alındı:\n", response)
-                return response
+        try:
+            # Wait for the assistant's reply element that follows the given prompt
+            response_element, next_testid_index = self.__find_next_conversation_turn(prompt, timeout=timeout)
+            
+            # Check if the assistant's response contains an error
+            if self.__check_error(next_testid_index):
+                print("An error occurred in ChatGPT's response:")
+                print(self.__check_error(next_testid_index))
+                return None
+            
+            # Extract and return the reply content if available
+            if response_element.text:
+                response = response_element.text.strip()
+                if response:
+                    print("Response received:\n", response)
+                    return response
+                else:
+                    print("Response is empty.")
             else:
-                print("Yanıt geldi ama boş görünüyor.")
-        else:
-            print("Yanıt elementi bulundu ama içinde metin yok.")
+                print("Response element found but contains no text.")
 
-    except Exception as e:
-        print("Hata oluştu:")
-        print(str(e))
+        except Exception as e:
+            print("Error occurred:")
+            print(str(e))
 
-    return None
+        return None
+
+# INIT HERE 
+globalChatGpt = ChatGPT("chatGPT_config.json")
 
 #### ChatGPT ####
