@@ -38,7 +38,7 @@ import unicodedata  # Unicode karakterlerin normalleştirilmesi (örn. aksan tem
 import undetected_chromedriver as uc  # Chrome tarafından tespit edilmeden Selenium kullanmak için özel WebDriver
 import pyperclip  # Panoya (clipboard) metin kopyalayıp yapıştırmak için kullanılır
 import json
-
+import psutil
 ### sms atma fonksiyonu
 
 
@@ -447,7 +447,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                     EC.any_of(
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Loading your chats')]")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Sohbetleriniz yükleniyor')]")),
@@ -471,7 +471,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                                     EC.any_of(
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
                                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                                     )
                                 )
@@ -489,7 +489,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                                     EC.any_of(
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
                                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                                     )
                                 )
@@ -520,7 +520,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                             EC.any_of(
                                 EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                                 EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
                                 EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                             )
                         )
@@ -548,7 +548,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
             if not qr_code_present:
                 qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")
             
-            profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Chats']")
+            profile_present = driver.find_elements(By.CSS_SELECTOR, "span[aria-label='WhatsApp']")
             if not profile_present:
                 profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Sohbetler']")
             
@@ -576,7 +576,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                 # QR kodu bulunca timeout saniye de QR kodu okutup Whatsapp'a giriş yapman için bekleme
                 profile_present = WebDriverWait(driver, timeout).until(
                     EC.any_of(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                     )
                 )
@@ -684,17 +684,25 @@ def __search_and_select_chat(someone_or_group_name, driver, timeout: int = 100):
     except:
         return False  # Arama kutusu bulunamadı
 
-    try:
-        # Arama sonuçlarını bekle
-        WebDriverWait(driver, timeout).until(
-            lambda d: any(
-                span.is_displayed() and
-                EC.element_to_be_clickable(span.find_element(By.XPATH, "./ancestor::div[@role='listitem']"))(d)
-                for span in d.find_elements(By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']")
+    # Arama sonuçlarını bekle - retry'lı yapı (0.5'ten başlayıp artan bekleme)
+    for attempt in range(5):  # En fazla 5 deneme
+        try:
+            print(f"Arama sonuçları bekleniyor... ({attempt+1}. deneme)")
+            WebDriverWait(driver, timeout).until(
+                lambda d: len([
+                    r for r in d.find_elements(By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']")
+                    if r.text.strip()
+                ]) > 0
             )
-        )
-    except:
-        return False  # Arama sonuçları bulunamadı
+            time.sleep(0.5)  # sonuçlar yüklendiyse ufak bekleme
+            break  # başarıyla bulunduysa çık
+        except:
+            wait_time = 0.5 * (3*attempt + 1)
+            print(f"Arama sonuçları yüklenemedi. {wait_time} saniye beklenip tekrar denenecek... ({attempt+1}. deneme)")
+            time.sleep(wait_time)
+    else:
+        print("Arama sonuçları düzgün bir şekilde alınamadı.")
+        return False
 
     # Elementler değişmiş olabilir, tekrar alalım
     for _ in range(3):  # 3 kere deneyecek
@@ -704,39 +712,61 @@ def __search_and_select_chat(someone_or_group_name, driver, timeout: int = 100):
                 break  # Sonuçları başarılı şekilde aldıysa döngüyü kır
         except StaleElementReferenceException:
             continue  # Eğer element kaybolduysa tekrar dene
+    
 
     if results:
         # Tam eşleşme kontrolü
-        for r in results:
-            try:
-                # print(r.get_attribute("title"))
-                if r.get_attribute("title") == someone_or_group_name:
-                    r.click()
-                    print(f"Tam eşleşme bulundu ({r.get_attribute('title')}) ve seçildi")
-                    return True  # Tam eşleşme bulundu ve seçildi
-            except StaleElementReferenceException:
-                continue  # Eğer element geçersiz olduysa diğerlerine bak
+        for attempt in range(3):  # En fazla 3 deneme yap
+            results = driver.find_elements(By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']")
+            for r in results:
+                try:
+                    # print(r.get_attribute("title"))
+                    if r.get_attribute("title") == someone_or_group_name:
+                            try:
+                                r.click()
+                                WebDriverWait(driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+                                )
+                                print(f"[{attempt+1}. deneme] Tam eşleşme bulundu ({r.get_attribute('title')}) ve tıklandı")
+                                return True  # Tam eşleşme bulundu ve seçildi
+                            except:
+                                print(f"[{attempt+1}. deneme] Tıklama başarısız veya mesaj kutusu bulunamadı, enter'a basarak devam edildi")
+                                print("Tıklanamadı, sonuçlar güncelleniyor.")
+                except StaleElementReferenceException:
+                    continue  # Eğer element geçersiz olduysa diğerlerine bak
 
         # İçerenleri kontrol et
-        results = driver.find_elements(By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']")
-        for r in results:
-            try:
-                if someone_or_group_name.casefold() in r.get_attribute("title").casefold():
-                    r.click()
-                    print(f"{someone_or_group_name} Kısmi olarak {r.get_attribute('title')} ile eşleşti ve seçildi")
-                    return True  # Kısmi eşleşme bulundu ve seçildi
-            except StaleElementReferenceException:
-                continue  # Eğer element kaybolduysa diğerlerine bak
+        for attempt in range(3):  # En fazla 3 deneme yap
+            results = driver.find_elements(By.XPATH, "//div[@aria-label='Search results.' or @aria-label='Arama sonuçları.']//span[@dir='auto']")
+            for r in results:
+                try:
+                    if someone_or_group_name.casefold() in r.get_attribute("title").casefold():
+                        try:
+                            #driver.execute_script("arguments[0].click();", r)
+                            r.click()
+                            WebDriverWait(driver, 5).until(
+                                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+                            )
+                            print(f"[{attempt+1}. deneme] Kısmi olarak {r.get_attribute('title')} ile eşleşti ve tıklandı")
+                            return True  # Kısmi eşleşme bulundu ve seçildi
+                        except:
+                            print(f"[{attempt+1}. deneme] Tıklama başarısız veya mesaj kutusu bulunamadı:")
+                            print("Tıklanamadı, sonuçlar güncelleniyor.")
+                except StaleElementReferenceException:
+                    continue  # Eğer element kaybolduysa diğerlerine bak
 
-    # 'No chats, contacts or messages found' kontrolü
-    no_results_element = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.XPATH,"//span[contains(text(), 'No chats, contacts or messages found') or contains(text(), 'Sohbet, kişi veya mesaj bulunamadı')]"))
-    )
+    try:
+        # 'No chats, contacts or messages found' kontrolü
+        no_results_element = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.XPATH,"//span[contains(text(), 'No chats, contacts or messages found') or contains(text(), 'Sohbet, kişi veya mesaj bulunamadı')]"))
+        )
 
-    if no_results_element:
-        print("Böyle bir sohbet bulunamadı")
-        return False  # Böyle bir sohbet bulunamadı
-
+        if no_results_element:
+            print("Böyle bir sohbet bulunamadı")
+            return False  # Böyle bir sohbet bulunamadı
+    except:
+        pass
+    
     print("Beklenmeyen bir durum oluştu")
     return False  # Beklenmeyen bir durum oluştu
 
@@ -804,7 +834,7 @@ def send_message_to_someone_or_group(someone_or_group_name: str, message: str, d
         # Grup adına göre grubu bulma ve tıklama
         try:
 
-            if __search_and_select_chat(someone_or_group_name, driver):
+            if __search_and_select_chat(someone_or_group_name, driver, timeout=timeout):
                 print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
@@ -942,7 +972,7 @@ def send_file_to_someone_or_group(someone_or_group_name: str, file_path: str, dr
         # Grup adına göre grubu bulma ve tıklama
         try:
             
-            if __search_and_select_chat(someone_or_group_name, driver):
+            if __search_and_select_chat(someone_or_group_name, driver, timeout=timeout):
                 print("Grup bulundu ve açılıyor")
         
             # Mesaj kutusunun yüklenmesini bekleyin
@@ -1359,7 +1389,7 @@ def get_last_message(someone_or_group_name: str, driver: webdriver, clean_invisi
     try:
 
         # kişi adına göre kişiyi bulma ve tıklama
-        if __search_and_select_chat(someone_or_group_name, driver):
+        if __search_and_select_chat(someone_or_group_name, driver, timeout=timeout):
             print("Grup bulundu ve açılıyor")
     
         # Mesaj kutusunun yüklenmesini bekleyin
@@ -1368,13 +1398,44 @@ def get_last_message(someone_or_group_name: str, driver: webdriver, clean_invisi
         )
         print("Mesaj kutusu bulundu.")
 
-        # Wait until the chat interface has loaded by checking for incoming message elements
-        WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
-        )
-        WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
-        )
+        try:
+            WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
+            )
+            WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
+            )
+        except:
+            pass
+
+        try:
+            # Bekle ve butonu yazıya göre bul
+            button = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    '//button[.//div[text()="Click here to get older messages from your phone."] or .//div[text()="Telefonunuzdaki eski mesajları almak için buraya tıklayın."]]'
+                ))
+            )
+
+            # Tıkla
+            button.click()    
+
+            # Artık geçmiş mesajların yüklenmesini dinamik süreyle bekle
+            for i in range(3):  # En fazla 3 deneme yap
+                try:
+                    time.sleep(1 + i * 2)  
+
+                    current_count = len(driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") or contains(@class, "message-out")]'))
+
+                    if current_count > previous_count:
+                        break  # Yeni mesaj yüklendiyse çık
+
+                except:
+                    pass
+
+        except:
+            pass
+
         print("Chat loaded successfully.")
         
         # Locate all incoming message elements within the chat
@@ -1480,19 +1541,52 @@ def get_whatsapp_chat_history(someone_or_group_name: str, driver: webdriver, cle
 
 
     try:
-        if __search_and_select_chat(someone_or_group_name, driver):
+        if __search_and_select_chat(someone_or_group_name, driver, timeout=timeout):
             print("Grup bulundu ve açılıyor")
 
         WebDriverWait(driver, timeout).until(
             EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
         )
 
-        WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
-        )
-        WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
-        )
+        try:
+            WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-in")]'))
+            )
+            WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "message-out")]'))
+            )
+        except:
+            pass
+
+        try:
+            # Bekle ve butonu yazıya göre bul
+            button = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    '//button[.//div[text()="Click here to get older messages from your phone."] or .//div[text()="Telefonunuzdaki eski mesajları almak için buraya tıklayın."]]'
+                ))
+            )
+
+            previous_count = len(driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") or contains(@class, "message-out")]'))
+            # Tıkla
+            button.click()    
+
+            # Artık geçmiş mesajların yüklenmesini dinamik süreyle bekle
+            for i in range(3):  # En fazla 3 deneme yap
+                try:
+                    time.sleep(1 + i * 2)  
+
+                    current_count = len(driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") or contains(@class, "message-out")]'))
+
+                    if current_count > previous_count:
+                        break  # Yeni mesaj yüklendiyse çık
+
+                except:
+                    pass
+                
+        except:
+            pass
+        
         print("Chat fully loaded successfully.")
 
         # Tüm mesaj konteynerlerini al (hem gelen hem giden)
@@ -2916,47 +3010,35 @@ def format_text_for_input(prompt, retries=5, delay=0.2, verbose=True):
     return formatted_prompt
 
 
-def extract_all_json_blocks(text: str) -> list:
+def extract_first_json_block(text: str):
     """
-    Extract all valid JSON objects and arrays from a given text string.
-
-    This function looks for potential JSON blocks within the text, either objects ({...}) 
-    or arrays ([...]). It tries to parse each match using the `json` module and returns 
-    a list of successfully parsed JSON structures.
-
-    Args:
-        text (str): The full text content that may contain JSON data and other content.
-
-    Returns:
-        list: A list of parsed JSON objects or arrays. Invalid or malformed JSON parts 
-              are silently skipped.
-
-    Example:
-        input_text = '''
-            Info before JSON...
-            {"name": "Alice", "age": 25}
-            Some list: [1, 2, {"item": "value"}]
-            Broken JSON: {missing: quotes}
-        '''
-
-        result = extract_all_json_blocks(input_text)
-        print(result)
-        # Output: [{'name': 'Alice', 'age': 25}, [1, 2, {'item': 'value'}]]
+    Extract the first valid JSON object or array from the given text.
+    Returns a single parsed JSON structure (dict or list), or None if nothing valid is found.
     """
+    stack = []
+    start_index = None
 
-    # Regex to match JSON objects or arrays
-    pattern = r'(\{(?:[^{}[\]]|(?R))*\}|\[(?:[^\[\]{}]|(?R))*\])'
-    matches = re.findall(pattern, text)
+    for i, char in enumerate(text):
+        if char in '{[':
+            if not stack:
+                start_index = i
+            stack.append(char)
+        elif char in '}]':
+            if not stack:
+                continue
+            opening = stack.pop()
+            if ((opening == '{' and char != '}') or 
+                (opening == '[' and char != ']')):
+                stack = []
+                continue
+            if not stack:
+                candidate = text[start_index:i+1]
+                try:
+                    return json.loads(candidate)  # 👈 sadece ilk geçerli JSON'u döndürür
+                except json.JSONDecodeError:
+                    continue
+    return None  # Hiçbir şey bulamazsa
 
-    results = []
-    for match in matches:
-        try:
-            parsed = json.loads(match)
-            results.append(parsed)
-        except json.JSONDecodeError:
-            pass  # Skip if invalid JSON
-
-    return results
 
 
 
@@ -3078,6 +3160,39 @@ def launch_undetected_bot_browser(URL: str,
     time.sleep(3)  # Allow page to fully load
 
     return driver
+
+def kill_chrome_by_profile(profile_path):
+    """
+    Terminates any running Google Chrome processes that are using the specified user profile.
+
+    This function is particularly useful in Selenium-based automation projects where Chrome is launched 
+    with a specific user profile path (e.g., via --user-data-dir). If a previous automation run crashed 
+    or did not properly close Chrome (e.g., due to driver.quit() not being executed), leftover instances 
+    may cause conflicts when launching a new session.
+
+    Parameters:
+        profile_path (str): The absolute path to the Chrome user profile directory 
+                            (e.g., 'C:\\Users\\user\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 1').
+
+    Usage Scenario:
+        Use this function at the very beginning of your automation script to ensure no previous 
+        Chrome sessions using the same profile are still running. This helps prevent errors like 
+        "Chrome is being controlled by automated software" popups or profile lock issues.
+
+    Example:
+        kill_chrome_with_profile("C:\\SeleniumProfiller\\Profil")
+    """
+    profile_path_normalized = profile_path.lower().replace("\\", "/")
+    
+    for proc in psutil.process_iter(['name', 'cmdline']):
+        try:
+            if proc.info['name'] == 'chrome.exe':
+                cmdline = ' '.join(proc.info['cmdline']).lower().replace("\\", "/")
+                if profile_path_normalized in cmdline:
+                    print(f"Detected running Chrome with the specified profile'{profile_path}'. Terminating it.\nCMD: {cmdline}")
+                    proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
 
 def check_cloudflare_block(page: str, block_file_path: str) -> bool:
     """
@@ -3266,16 +3381,19 @@ class ChatGPT:
             )
 
             # If the 'I prefer this response' button exists, click it, then wait for the 'Read aloud' button to load
-            prefer_button = next_elem.find_element(By.XPATH, './/button[@data-testid="paragen-prefer-response-button"]')
-            if prefer_button:
-                prefer_button.click()
+            try:
+                prefer_button = next_elem.find_element(By.XPATH, './/button[@data-testid="paragen-prefer-response-button"]')
+                if prefer_button:
+                    prefer_button.click()
 
-                wait.until(
-                    EC.presence_of_element_located((
-                        By.XPATH,
-                        f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
-                    ))
-                )
+                    wait.until(
+                        EC.presence_of_element_located((
+                            By.XPATH,
+                            f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
+                        ))
+                    )
+            except:
+                pass
             
             print("Assistant's reply detected.")
 
