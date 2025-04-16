@@ -1417,6 +1417,7 @@ def get_last_message(someone_or_group_name: str, driver: webdriver, clean_invisi
                 ))
             )
 
+            previous_count = len(driver.find_elements(By.XPATH, '//div[contains(@class, "message-in") or contains(@class, "message-out")]'))
             # Tıkla
             button.click()    
 
@@ -3127,6 +3128,10 @@ def launch_undetected_bot_browser(URL: str,
         # Eğer manuel giriş isteniyorsa tarayıcı açılır,
         # kullanıcı giriş yaptıktan sonra Enter'a basması beklenir.
         manuel_giris_yap(URL)
+        print("Manuel giriş tamamlandı Program kapatılıyor.")
+        print("Artık gerekli değilse, aşağıdaki işlemi uygulayın ve programınızda kullanın.")
+        print("⚙️ Normal kullanıma geçebilmek için 'launch_undetected_bot_browser(..., manuel_giris=False)' şeklinde çağırmayı unutmayın.")
+        exit()
 
     # Chrome seçenekleri yapılandırılır
     options = uc.ChromeOptions()
