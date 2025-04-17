@@ -448,6 +448,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Loading your chats')]")),
                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Sohbetleriniz yükleniyor')]")),
@@ -472,6 +473,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
                                         EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
                                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                                     )
                                 )
@@ -490,6 +492,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                                         EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
                                         EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
                                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                                     )
                                 )
@@ -521,6 +524,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                                 EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Point your phone at this screen to scan the QR code')]")),
                                 EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")),
                                 EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
                                 EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                             )
                         )
@@ -548,9 +552,11 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
             if not qr_code_present:
                 qr_code_present = driver.find_elements(By.XPATH, "//*[contains(text(), 'Telefonunuzu bu ekrana doğrultarak QR kodunu tarayın')]")
             
-            profile_present = driver.find_elements(By.CSS_SELECTOR, "span[aria-label='WhatsApp']")
+            profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Chats']")
             if not profile_present:
                 profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Sohbetler']")
+
+            profile_present = driver.find_elements(By.CSS_SELECTOR, "span[aria-label='WhatsApp']")
             
             if qr_code_present:
                 print("QR kodu yükleniyor.")
@@ -577,6 +583,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                 profile_present = WebDriverWait(driver, timeout).until(
                     EC.any_of(
                         EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-label='WhatsApp']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Chats']")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Sohbetler']"))
                     )
                 )
