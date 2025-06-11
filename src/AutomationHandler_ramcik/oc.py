@@ -556,7 +556,8 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
             if not profile_present:
                 profile_present = driver.find_elements(By.CSS_SELECTOR, "div[title='Sohbetler']")
 
-            profile_present = driver.find_elements(By.CSS_SELECTOR, "span[aria-label='WhatsApp']")
+            if not profile_present:
+                profile_present = driver.find_elements(By.CSS_SELECTOR, "span[aria-label='WhatsApp']")
             
             if qr_code_present:
                 print("QR kodu yükleniyor.")
