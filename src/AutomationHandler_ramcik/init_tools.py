@@ -35,6 +35,8 @@ def oc_install_deps():
         "numpy",  # Numerical Python
         "pyautogui",  # GUI automation
         "requests",  # HTTP library for web requests
+        "undetected-chromedriver",  # Stealthy Chrome automation
+        "psutil",  # Process and system utilization library
     ]
     
     # Try installing each package
@@ -89,8 +91,7 @@ def oc_create_myenvfile():
             "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
             "SENDER_EMAIL": "example_sender@gmail.com",
             "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password",
-            "MS_COPILOT_EMAIL": "your-email@outlook.com",
-            "MS_COPILOT_PASSWORD": "your-email-password"
+            "UCHROME_PROFILE_PATH":"C:/Users/YourUsername/OmnesCore/UChromeProfiles/profile"
         }
 
     if os.name == 'posix':
@@ -106,8 +107,7 @@ def oc_create_myenvfile():
             "MY_TELEGRAM_BOT_CHAT_ID_WITH_ME": "your-telegram-chat-id",
             "SENDER_EMAIL": "example_sender@gmail.com",
             "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password",
-            "MS_COPILOT_EMAIL": "your-email@outlook.com",
-            "MS_COPILOT_PASSWORD": "your-email-password"
+            "UCHROME_PROFILE_PATH":"C:/Users/YourUsername/OmnesCore/UChromeProfiles/profile"
         }
     
     # Ensure the folder exists, create if not

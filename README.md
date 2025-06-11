@@ -7,7 +7,7 @@ Effortless automation for **Email**, **WhatsApp**, and **Telegram** via Selenium
 1. [Requirements](#requirements)
 2. [Installation](#installation)
     - [pip Install for library](#from-pypi-python-package-index)
-    - [Installation for linux](#installation-for-linux)
+    - [Installation for linux](#requirements-installation)
     - [Installation for Windows](#installation-for-windows)
 3. [Editing Env Variables](#edit-created-myenvfileenv)
 4. [Setting up Env Variables](#setting-up-environmental-variables)
@@ -16,17 +16,19 @@ Effortless automation for **Email**, **WhatsApp**, and **Telegram** via Selenium
 
 ---
 
-## Requirements
+# Requirements
 
 List any prerequisites needed to install or run your library.
 
 - Programming language version (e.g., Python >= 3.8)
-- Dependencies (e.g., `selenium`, `webdriver-manager`, `Pillow`, `google-cloud-vision`, `telethon`, `opencv-python`,`numpy`, `pyautogui`, `requests`)
+- Dependencies (e.g., `selenium`, `webdriver-manager`, `Pillow`, `google-cloud-vision`, `telethon`, `opencv-python`,`numpy`, `pyautogui`, `requests`, `undetected-chromedriver`, `psutil`)
 - System requirements (e.g., Linux, Windows)
+---
+# 🔵 1. Step - İnstall Library first
+---
+## Installation
 
-# Installation
-
-## From PyPI (Python Package Index)
+### From PyPI (Python Package Index)
 
 ```bash
 pip install -i https://test.pypi.org/simple/ AutomationHandler-ramcik
@@ -36,6 +38,11 @@ pip uninstall https://test.pypi.org/simple/ AutomationHandler-ramcik
 
 # If you want to upgrade, First uninstall, then install again.
 ```
+---
+# 🔵 2. Step - Requirements İnstallation
+---
+## Requirements İnstallation
+
 ## Installation for linux
 ```python
 # main.py
@@ -54,7 +61,7 @@ init_tools.oc_create_myenvfile() # creates a file at $HOME/OmnesCore/myenvfile.e
 #ends here 
 
 ```
-# run python script 
+##### run python script 
 ```bash
 # pythonInterpreterPath is python interpreter you mainly use with this library
 # If running the code below leaves any modules missing, try running the following 
@@ -63,7 +70,7 @@ init_tools.oc_create_myenvfile() # creates a file at $HOME/OmnesCore/myenvfile.e
 sudo pythonInterpreterPath main.py
 ```
 
-# if there is missing module run 
+##### if there is missing module run 
 ```bash
 # If there are any modules that fail to load when main.py is run, the following command 
 # can be used to complete the installation.
@@ -90,8 +97,11 @@ init_tools.oc_install_deps()
 init_tools.oc_create_myenvfile()  # creates a file at ~/OmnesCore/myenvfile.env in the user's home directory, e.g., C:/Users/Username/OmnesCore/myenvfile.env
 # ends here
 ```
+---
+# 🔵 3. Step - Define Environment Variables
+---
 
-# Edit created myenvfile.env
+## Edit created myenvfile.env
 - Edit created file For Linux =>  $HOME/OmnesCore/myenvfile.env 
 - Edit created file For Windows =>  ~/OmnesCore/myenvfile.env in the user's home directory, e.g., C:/Users/Username/OmnesCore/myenvfile.env 
 
@@ -198,17 +208,16 @@ A sender mail which used for sending mail
 "SENDER_EMAIL_APP_PASSWORD": "your-email-app-password"
 A sender mail password which used for sending mail
 ```
-##### MS_COPILOT_EMAIL
+##### UCHROME_PROFILE_PATH
 ```
-"MS_COPILOT_EMAIL": "example@outlook.com"
-Your registered email for Microsoft Copilot.
-```
-##### MS_COPILOT_PASSWORD
-```
-"MS_COPILOT_PASSWORD*": "your-email-password"
-Your secure password for authentication.
-```
+"UCHROME_PROFILE_PATH": "C:\\Users\\YourUsername\\OmnesCore\\UChromeProfiles\\profile"
+The path to your undetected Chrome user profile directory used by automation scripts.
 
+This profile is essential for bypassing bot detection systems (like Cloudflare) by preserving cookies, login sessions, and browser fingerprints between runs.
+```
+---
+# 🔵 4. Step - Load and Activate Environment Variables
+---
 # Setting up Environmental Variables
 
 ### **After Editing `myenvfile.env` File, run python script.**
@@ -228,7 +237,9 @@ source ~/.bashrc
 - After running the script above, restart Visual Studio Code:
 
 
-
+---
+# 🔵 5. Step - Create and Test WhatsApp Profiles
+---
 # Opening WhatsApp Profiles
 
 ### Primary WhatsApp Profile (`CHROME_PRIMARY_WHATSAPP_PROFILE_PATH`)
@@ -310,8 +321,11 @@ For Windows users, if you face a similar error:
 5. Click **Apply** and then **OK** to save the changes.
 
 
-
+---
+# 🔵 6. Step - Start Using the OmnesCore Library
+---
 # Congratulations! start using the library🔥
 ```python
 from AutomationHandler_ramcik import oc
 ```
+---

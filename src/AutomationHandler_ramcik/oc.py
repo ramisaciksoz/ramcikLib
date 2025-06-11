@@ -3054,18 +3054,29 @@ def extract_first_json_block(text: str):
 ##################### Cloudflare ve Bot Tespitine Duyarlı Tarayıcı Açma Araçları ############################
 
 
-def manuel_giris_yap(URL):
+def manuel_giris_yap(URL: str, 
+                    undetected_chrome_profile_path: str = os.getenv('UCHROME_PROFILE_PATH'), 
+                    profile_directory: str = "Default",
+                    language: str = "en"):
     """
     Belirtilen URL'ye Chrome profiliyle gidip kullanıcıdan manuel giriş yapması istenir.
     Giriş tamamlandıktan sonra Enter'a basıldığında tarayıcı kapanır.
+
+    Parametreler:
+        URL (str): Kullanıcının manuel giriş yapacağı web sayfasının adresi.
+        undetected_chrome_profile_path (str): Chrome'un undetected profiline ait tam klasör yolu. 
+                                              Varsayılan olarak 'UCHROME_PROFILE_PATH' ortam değişkeninden alınır.
+        profile_directory (str): Profil klasörü içindeki alt dizin adı (örneğin "Default", "Profile 1").
+        language (str): Tarayıcının dil ayarı (örneğin "en", "tr").
     """
 
     # Chrome seçenekleri yapılandırılır
     options = uc.ChromeOptions()
 
     # Kalıcı profil ve dizin ayarlarını uygula
-    options.add_argument("--user-data-dir=C:\\SeleniumProfiller\\Profil")
-    options.add_argument("--profile-directory=Default")
+    options.add_argument(f"--user-data-dir={undetected_chrome_profile_path}")
+    options.add_argument(f"--profile-directory={profile_directory}")
+    options.add_argument(f"--lang={language}")
 
     print("🔐 Tarayıcı açılıyor...")
     print("📌 Lütfen aşağıdaki adımları önceden gerçekleştirmiş olun:")
@@ -3092,7 +3103,7 @@ def manuel_giris_yap(URL):
 
 
 def launch_undetected_bot_browser(URL: str, 
-                                  selenium_profil: str = "C:\\SeleniumProfiller\\Profil", 
+                                  undetected_chrome_profile_path: str = os.getenv('UCHROME_PROFILE_PATH'), 
                                   profile_directory: str = "Default",
                                   language: str = "en", 
                                   headless: bool = False,
@@ -3103,7 +3114,8 @@ def launch_undetected_bot_browser(URL: str,
     - ### Parameters:
 
         - `URL` (str): The web page to open immediately after launching the browser.
-        - `selenium_profil` (str): Path to the user data directory for persistent profile storage.
+        - undetected_chrome_profile_path (str): Full path to the undetected Chrome user profile directory.
+                                              Defaults to the value of the UCHROME_PROFILE_PATH environment variable.
         - `profile_directory` (str): Subdirectory name inside the profile folder (e.g., "Default", "Profile 1").
         - `language` (str): Language to set for the browser (e.g., "en", "tr"). Default is English.
         - `headless` (bool): Whether to launch the browser in headless mode. Default is False.
@@ -3125,7 +3137,7 @@ def launch_undetected_bot_browser(URL: str,
         ```python
         driver = launch_undetected_bot_browser(
             URL="https://example.com",
-            selenium_profil="C:\\MyProfiles\\BotUser1",
+            undetected_chrome_profile_path="C:\\Users\\YourName\\OmnesCore\\UChromeProfiles\\profile",
             profile_directory="Profile 1",
             language="tr",
             headless=True
@@ -3135,7 +3147,7 @@ def launch_undetected_bot_browser(URL: str,
     if manuel_giris:
         # Eğer manuel giriş isteniyorsa tarayıcı açılır,
         # kullanıcı giriş yaptıktan sonra Enter'a basması beklenir.
-        manuel_giris_yap(URL)
+        manuel_giris_yap(URL, undetected_chrome_profile_path, profile_directory, language)
         print("Manuel giriş tamamlandı Program kapatılıyor.")
         print("Artık gerekli değilse, aşağıdaki işlemi uygulayın ve programınızda kullanın.")
         print("⚙️ Normal kullanıma geçebilmek için 'launch_undetected_bot_browser(..., manuel_giris=False)' şeklinde çağırmayı unutmayın.")
@@ -3151,7 +3163,7 @@ def launch_undetected_bot_browser(URL: str,
     options.add_argument("--start-maximized")
 
     # Kalıcı profil ve dizin ayarlarını uygula
-    options.add_argument(f"--user-data-dir={selenium_profil}")
+    options.add_argument(f"--user-data-dir={undetected_chrome_profile_path}")
     options.add_argument(f"--profile-directory={profile_directory}")
 
     # Dil ve user-agent ayarları
@@ -3174,7 +3186,7 @@ def launch_undetected_bot_browser(URL: str,
 
     return driver
 
-def kill_chrome_by_profile(profile_path):
+def kill_chrome_by_profile(undetected_chrome_profile_path: str = os.getenv('UCHROME_PROFILE_PATH')):
     """
     Terminates any running Google Chrome processes that are using the specified user profile.
 
@@ -3184,8 +3196,8 @@ def kill_chrome_by_profile(profile_path):
     may cause conflicts when launching a new session.
 
     Parameters:
-        profile_path (str): The absolute path to the Chrome user profile directory 
-                            (e.g., 'C:\\Users\\user\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 1').
+        undetected_chrome_profile_path (str): Full path to the undetected Chrome user profile directory.
+                                              Defaults to the value of the UCHROME_PROFILE_PATH environment variable.
 
     Usage Scenario:
         Use this function at the very beginning of your automation script to ensure no previous 
@@ -3193,16 +3205,16 @@ def kill_chrome_by_profile(profile_path):
         "Chrome is being controlled by automated software" popups or profile lock issues.
 
     Example:
-        kill_chrome_with_profile("C:\\SeleniumProfiller\\Profil")
+        kill_chrome_with_profile("C:\\Users\\YourName\\OmnesCore\\UChromeProfiles\\profile")
     """
-    profile_path_normalized = profile_path.lower().replace("\\", "/")
+    profile_path_normalized = undetected_chrome_profile_path.lower().replace("\\", "/")
     
     for proc in psutil.process_iter(['name', 'cmdline']):
         try:
             if proc.info['name'] == 'chrome.exe':
                 cmdline = ' '.join(proc.info['cmdline']).lower().replace("\\", "/")
                 if profile_path_normalized in cmdline:
-                    print(f"Detected running Chrome with the specified profile'{profile_path}'. Terminating it.\nCMD: {cmdline}")
+                    print(f"Detected running Chrome with the specified profile'{undetected_chrome_profile_path}'. Terminating it.\nCMD: {cmdline}")
                     proc.kill()
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
@@ -3223,25 +3235,56 @@ def check_cloudflare_block(page: str, block_file_path: str) -> bool:
         bool: Returns False if a Cloudflare block is detected, True otherwise.
     """
 
-    # Cloudflare kontrolü yap
     cloudflare_signals = [
-        "checking your browser",
-        "attention required",
-        "just a moment",
-        "<title>access denied</title>",
-        "cloudflare ray id",
-        "please enable cookies",
-        "your browser will redirect",
-        "we are checking your browser",
-        "one more step",
-        "security check to access",
-        "performance & security by cloudflare",
-        "cf-browser-verification",
-        "cf-error-details",
-        "ddos protection by cloudflare",
-        "verifying you are human",
-        "this may take a few seconds",
-        "needs to review the security of your connection"
+    # İngilizce ifadeler
+    "checking your browser",
+    "attention required",
+    "just a moment",
+    "<title>access denied</title>",
+    "cloudflare ray id",
+    "please enable cookies",
+    "your browser will redirect",
+    "we are checking your browser",
+    "one more step",
+    "security check to access",
+    "performance & security by cloudflare",
+    "cf-browser-verification",
+    "cf-error-details",
+    "ddos protection by cloudflare",
+    "verifying you are human",
+    "verify you are human",
+    "this may take a few seconds",
+    "needs to review the security of your connection",
+
+    # Türkçe karşılıkları
+    "tarayıcınız kontrol ediliyor",
+    "dikkat gerekli",
+    "lütfen birkaç saniye bekleyin",
+    "erişim reddedildi",
+    "çerezleri etkinleştirin",
+    "tarayıcınız yönlendirilecek",
+    "güvenlik kontrolü yapılıyor",
+    "erişim için son bir adım",
+    "cloudflare tarafından korunmaktadır",
+    "ddos koruması",
+    "insan olduğunuz doğrulanıyor",
+    "bu birkaç saniye sürebilir",
+    "doğrulama beklenenden uzun sürüyor",
+    "bağlantı güvenliği inceleniyor",
+    "insan olduğunuzu doğrulayın",
+    "bağlantınızın güvenliğini gözden geçirmesi gerekiyor",
+
+    # Yeni ve doğrulanmış Türkçe ifadeler
+    "lütfen bekleyin",
+    "bir saniye...",
+    "bağlantının güvenliğini doğrulaması gerekiyor",
+    "bir adım daha",
+    "robot olmadığınızı doğrulayın",
+    "güvenlik kontrolünü tamamlayın",
+    "<title>erişim engellendi</title>",
+    "bu web sitesine erişiminiz engellendi",
+    "cloudflare tarafından performans ve güvenlik",
+    "cloudflare tarafından ddos koruması"
     ]
 
     for signal in cloudflare_signals:
