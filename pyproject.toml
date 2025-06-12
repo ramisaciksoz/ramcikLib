@@ -1,6 +1,6 @@
 [project]
 name = "AutomationHandler_ramcik"
-version = "0.0.35"
+version = "0.0.36"
 authors = [
   { name="Ramis", email="ramis155r@gmail.com" },
 ]
