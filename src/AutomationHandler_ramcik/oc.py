@@ -3021,11 +3021,9 @@ def format_text_for_input(prompt, retries=5, delay=0.2, verbose=True):
 
 def extract_first_json_block(text: str):
     """
-    Extract the first valid JSON object or array from the given text.
-    Returns a single parsed JSON structure (dict or list), or None if nothing valid is found.
+    Metin içindeki ilk geçerli JSON nesnesini veya dizisini bulur, çözer ve temiz biçimde yazdırır.
     """
-    stack = []
-    start_index = None
+    stack, start_index = [], None
 
     for i, char in enumerate(text):
         if char in '{[':
@@ -3036,17 +3034,20 @@ def extract_first_json_block(text: str):
             if not stack:
                 continue
             opening = stack.pop()
-            if ((opening == '{' and char != '}') or 
-                (opening == '[' and char != ']')):
-                stack = []
+            if (opening == '{' and char != '}') or (opening == '[' and char != ']'):
+                stack.clear()
                 continue
             if not stack:
-                candidate = text[start_index:i+1]
+                candidate = text[start_index:i + 1]
                 try:
-                    return json.loads(candidate)  # 👈 sadece ilk geçerli JSON'u döndürür
+                    parsed = json.loads(candidate)
+                    #print(json.dumps(parsed, ensure_ascii=False, indent=2))
+                    return parsed
                 except json.JSONDecodeError:
                     continue
-    return None  # Hiçbir şey bulamazsa
+
+    print("Geçerli bir JSON bulunamadı.")
+    return None
 
 
 
@@ -3358,6 +3359,85 @@ class ChatGPT:
         self.driver = driver
         print("Driver injected successfully.")
 
+    def __wait_ready_response(self, next_testid: str, timeout: int = 20):
+        """
+        Wait until *any* action-button under the given conversation turn
+        appears **and** its ``data-testid`` attribute is non-empty.
+
+        Parameters
+        ----------
+        next_testid : str
+            The turn identifier, e.g. ``"conversation-turn-2"``.
+        timeout : int, default 20
+            Maximum time to wait, in seconds.
+
+        Returns
+        -------
+        selenium.webdriver.remote.webelement.WebElement
+            The first matching button whose ``data-testid`` is populated.
+
+        Side Effects
+        ------------
+        Prints the button’s ``aria-label`` and ``data-testid`` to stdout.
+        """
+        wait = WebDriverWait(self.driver, timeout)
+
+        ready_response = wait.until(
+            EC.any_of(
+                # 1) Prefer-response
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    f'//*[@data-testid="{next_testid}"]'
+                    '//button[@data-testid="paragen-prefer-response-button" '
+                    '         and string-length(@data-testid)>0]'
+                )),
+                # 2) Bad response
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    f'//*[@data-testid="{next_testid}"]'
+                    '//*[@aria-label="Kötü cevap" or @aria-label="Bad response"]'
+                    ' [string-length(@data-testid)>0]'
+                )),
+                # 3) Good response
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    f'//*[@data-testid="{next_testid}"]'
+                    '//*[@aria-label="İyi cevap" or @aria-label="Good response"]'
+                    ' [string-length(@data-testid)>0]'
+                )),
+                # 4) Copy / Kopyala
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    f'//*[@data-testid="{next_testid}"]'
+                    '//button[@aria-label="Kopyala" or @aria-label="Copy"]'
+                    ' [string-length(@data-testid)>0]'
+                )),
+                # 5) Read aloud
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    f'//*[@data-testid="{next_testid}"]'
+                    '//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
+                    ' [string-length(@data-testid)>0]'
+                )),
+                # 6) Edit in canvas
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    f'//*[@data-testid="{next_testid}"]'
+                    '//*[@aria-label="Kanvasta düzenle" or @aria-label="Edit in canvas"]'
+                    ' [string-length(@data-testid)>0]'
+                ))
+            )
+        )
+
+        # aria    = ready_response.get_attribute("aria-label") \
+        #         or ready_response.get_dom_attribute("aria-label")
+        # test_id = ready_response.get_attribute("data-testid") \
+        #         or ready_response.get_dom_attribute("data-testid")
+
+        # print("Bulunan eleman özellikleri:")
+        # print("  aria-label :", aria)
+        # print("  data-testid:", test_id)
+
     def __find_next_conversation_turn(self ,target_text, timeout=300):
         """
         Finds the assistant's response element that directly follows a specific user prompt
@@ -3423,31 +3503,16 @@ class ChatGPT:
             print("Waiting for assistant's reply...")
 
             # Wait for either the 'I prefer this response' button or the 'Read aloud' button to appear
-            wait.until(
-                EC.any_of(
-                    EC.presence_of_element_located((
-                        By.XPATH,
-                        f'//*[@data-testid="{next_testid}"]//button[@data-testid="paragen-prefer-response-button"]'
-                    )),
-                    EC.presence_of_element_located((
-                        By.XPATH,
-                        f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
-                    ))
-                )
-            )
+            self.__wait_ready_response(next_testid, timeout = timeout)
 
             # If the 'I prefer this response' button exists, click it, then wait for the 'Read aloud' button to load
             try:
                 prefer_button = next_elem.find_element(By.XPATH, './/button[@data-testid="paragen-prefer-response-button"]')
                 if prefer_button:
                     prefer_button.click()
-
-                    wait.until(
-                        EC.presence_of_element_located((
-                            By.XPATH,
-                            f'//*[@data-testid="{next_testid}"]//*[@aria-label="Sesli oku" or @aria-label="Read aloud"]'
-                        ))
-                    )
+                    # Wait for either the 'I prefer this response' button or the 'Read aloud' button to appear
+                    self.__wait_ready_response(next_testid, timeout = timeout)
+                    
             except:
                 pass
             
@@ -3578,7 +3643,7 @@ class ChatGPT:
                 prompt += output_format
             
             # Append default raw string instruction to ensure clean output
-            prompt += "Return the answer as a raw string, just give answer"
+            # prompt += "\nReturn the answer as a raw string, just give answer"
 
             # Prepare the final string for clipboard pasting
             formatted_prompt = format_text_for_input(prompt)
@@ -3634,7 +3699,7 @@ class ChatGPT:
             if response_element.text:
                 response = response_element.text.strip()
                 if response:
-                    print("Response received:\n", response)
+                    print("Response received:")
                     return response
                 else:
                     print("Response is empty.")
