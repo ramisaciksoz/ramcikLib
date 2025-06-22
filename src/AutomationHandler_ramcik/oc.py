@@ -1,4 +1,5 @@
 from selenium import webdriver  # WebDriver ile tarayıcı otomasyonu için gerekli kütüphane
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By  # HTML elementlerini bulmak için kullanılan konum belirleyici
 from selenium.webdriver.common.keys import Keys  # Klavye tuşlarını simüle etmek için kullanılır
 from selenium.webdriver.support.ui import WebDriverWait  # Belirli bir durumun gerçekleşmesini beklemek için kullanılır
@@ -2927,7 +2928,208 @@ def wait_for_network_stabilization(driver: webdriver, max_inactive_time: int = 2
         duration = end_time - start_time
         print(f"wait_for_network_stabilization fonksiyonu toplam çalışma süresi: {duration:.2f} saniye.")
         return False
-    
+
+def detect_network_activity(driver: webdriver,
+                          max_checks: int = 3,
+                          poll_interval: float = 0.5,
+                          change_threshold: int = 1) -> bool:
+    """
+    Detects new Network.responseReceived events.
+    Stops after *max_checks* polling cycles.
+
+    Parameters
+    ----------
+    driver : webdriver
+        Selenium WebDriver with performance logging enabled.
+    max_checks : int, default 20
+        Maximum polling iterations before giving up.
+        Effective time-out = max_checks × poll_interval.
+    poll_interval : float, default 0.5
+        Seconds between log snapshots.
+    change_threshold : int, default 1
+        Minimum new responses that count as “a change”.
+
+    Returns
+    -------
+    bool
+        True  – change detected within the allotted checks  
+        False – no change detected
+    """
+    baseline = len([log for log in driver.get_log("performance")
+                    if "Network.responseReceived" in log["message"]])
+    print(f"[net-detect] Baseline responses: {baseline}")
+
+    for check in range(1, max_checks + 1):
+        time.sleep(poll_interval)
+
+        current = len([log for log in driver.get_log("performance")
+                       if "Network.responseReceived" in log["message"]])
+        delta = current - baseline
+        print(f"[net-detect] Check {check:02d} | +{delta} responses "
+              f"(threshold {change_threshold})")
+
+        if delta >= change_threshold:
+            print(f"[net-detect] ✅ Change detected on check {check} "
+                  f"(+{delta} responses).")
+            return True
+
+    print(f"[net-detect] ⚠️ No change (≥{change_threshold}) after "
+          f"{max_checks} checks.")
+    return False
+
+
+def reset_wan_connection(
+    url: str,
+    user: str,
+    pwd: str,
+    headless: bool = False,
+    attempts: int = 30,
+    refresh_interval: int = 2,
+    ip_service: str = "https://api.ipify.org"
+) -> tuple[str, str] | None:
+    """
+    Logs into the router admin panel, disconnects and reconnects the WAN interface,
+    then fetches the new public IP address.
+
+    Parameters:
+    -----------
+    url : str
+        The local URL of the router admin panel (e.g., "http://192.168.1.1").
+    user : str
+        The login username for the router.
+    pwd : str
+        The login password for the router.
+    headless : bool, optional
+        If True, runs the browser in headless mode. Default is False.
+    attempts : int, optional
+        Number of refresh attempts after disconnecting. Default is 30 (~1 minute).
+    refresh_interval : int, optional
+        Time to wait (in seconds) between each refresh. Default is 2 seconds.
+    ip_service : str, optional
+        The API URL to get the public IP address. Default is "https://api.ipify.org".
+
+    Returns:
+    --------
+    tuple[str, str] | None
+        Returns a tuple (old_ip, new_ip) if successful,
+        or None if reconnection failed within the allowed attempts.
+
+    Example:
+    --------
+    >>> old_ip, new_ip = reset_wan_connection(
+            url="http://192.168.1.1",
+            user="admin",
+            pwd="password123",
+            headless=True
+        )
+    >>> print("IP changed from", old_ip, "to", new_ip)
+    """
+
+    def public_ip() -> str:
+        try:
+            return requests.get(ip_service, timeout=5).text.strip()
+        except Exception:
+            return "Unable to retrieve IP"
+
+    # ── Browser Setup ───────────────────────
+    opts = Options()
+    if headless:
+        opts.add_argument("--headless")
+    driver = webdriver.Chrome(options=opts)
+
+    try:
+        # 1) Login
+        driver.get(url)
+
+        WebDriverWait(driver, 2).until(
+            EC.element_to_be_clickable((By.ID, "userName"))
+        ).send_keys(user)
+
+        WebDriverWait(driver, 2).until(
+            EC.element_to_be_clickable((By.ID, "pcPassword"))
+        ).send_keys(pwd)
+
+        WebDriverWait(driver, 2).until(
+            EC.element_to_be_clickable((By.ID, "loginBtn"))
+        ).click()
+
+        try:
+            WebDriverWait(driver, 2).until(EC.alert_is_present()).accept()
+        except TimeoutException:
+            pass
+
+        # 2) Skip button
+        WebDriverWait(driver, 2).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "div.btn[onclick='skip()']"))
+        ).click()
+
+        # 3) Navigate to Network > WAN
+        WebDriverWait(driver, 2).until(
+            EC.element_to_be_clickable((By.ID, "menu_network"))
+        ).click()
+
+        old_ip = public_ip()
+        #print("🔎 Public IP (before):", old_ip)
+
+        rows = WebDriverWait(driver, 2).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "#wan_table tr"))
+        )
+
+        active = next((r for r in rows if "Connected" in r.text
+                                      and "YES" in r.text
+                                      and "0.0.0.0" not in r.text), None)
+
+        if not active:
+            raise RuntimeError("No active WAN connection row found.")
+
+        # Disconnect
+        WebDriverWait(active, 2).until(
+            EC.element_to_be_clickable(
+                (By.XPATH, ".//input[@value='Disconnect' and contains(@onclick,'doDisConn')]")
+            )
+        ).click()
+        print("🔌 Disconnect button clicked")
+
+        # Wait and Refresh loop
+        for _ in range(attempts):
+            time.sleep(refresh_interval)
+
+            WebDriverWait(driver, 2).until(
+                EC.element_to_be_clickable((By.ID, "refresh"))
+            ).click()
+
+            try:
+                WebDriverWait(driver, 2).until(
+                    EC.presence_of_element_located(
+                        (By.XPATH,
+                         "//tr[contains(., 'Connected') and contains(., 'YES') and not(contains(., '0.0.0.0'))]")
+                    )
+                )
+                print("⚡ WAN reconnected!")
+                break
+            except TimeoutException:
+                try:
+                    WebDriverWait(driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH,
+                             "//input[@value='Connect' and contains(@onclick,'doConn')]")
+                        )
+                    ).click()
+                    print("🖱️ Connect button clicked")
+                except Exception:
+                    pass
+        else:
+            print("❌ WAN did not reconnect in time")
+            return None
+
+        new_ip = public_ip()
+        #print("🌐 Public IP (after):", new_ip)
+        return old_ip, new_ip
+
+    finally:
+        driver.quit()
+
+
 def to_custom_base5_with_unicode(number):
     """
     Converts a non-negative integer into a custom base-5 format using specific invisible Unicode characters.
@@ -3220,96 +3422,344 @@ def kill_chrome_by_profile(undetected_chrome_profile_path: str = os.getenv('UCHR
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
-def check_cloudflare_block(page: str, block_file_path: str) -> bool:
+def cloudflare_signal_set(extra_signals: list[str] | None = None) -> set[str]:
     """
-    Checks whether access has been blocked by Cloudflare.
-
-    Scans the page content for common Cloudflare block signals.  
-    If any matching signal is found, it logs the timestamp and the detected phrase  
-    into the specified file path, notifies the user, and stops the program from continuing.
+    Returns a set of known Cloudflare block/challenge phrases.
+    Optionally merges in custom signals provided by the user.
 
     Args:
-        page (str): The HTML content of the page to be checked.
-        block_file_path (str): File path to write block details if Cloudflare is detected.
+        extra_signals (list[str] | None): Custom signal phrases to include (case-insensitive).
 
     Returns:
-        bool: Returns False if a Cloudflare block is detected, True otherwise.
+        set[str]: All default + extra signals, lowercase, de-duplicated.
+
+    Example
+    -------
+    >>> signals = cloudflare_signal_set()
+    >>> "checking your browser" in signals
+    True
+
+    >>> custom_signals = cloudflare_signal_set(extra_signals=["temporary ddos block"])
+    >>> "temporary ddos block" in custom_signals
+    True
     """
+    
+    default_signals = [
+        # İngilizce
+        "checking your browser", "attention required", "just a moment",
+        "<title>access denied</title>", "cloudflare ray id", "please enable cookies",
+        "your browser will redirect", "we are checking your browser", "one more step",
+        "security check to access", "performance & security by cloudflare",
+        "cf-browser-verification", "cf-error-details",
+        "ddos protection by cloudflare", "verifying you are human",
+        "verify you are human", "this may take a few seconds",
+        "needs to review the security of your connection",
 
-    cloudflare_signals = [
-    # İngilizce ifadeler
-    "checking your browser",
-    "attention required",
-    "just a moment",
-    "<title>access denied</title>",
-    "cloudflare ray id",
-    "please enable cookies",
-    "your browser will redirect",
-    "we are checking your browser",
-    "one more step",
-    "security check to access",
-    "performance & security by cloudflare",
-    "cf-browser-verification",
-    "cf-error-details",
-    "ddos protection by cloudflare",
-    "verifying you are human",
-    "verify you are human",
-    "this may take a few seconds",
-    "needs to review the security of your connection",
+        # Türkçe
+        "tarayıcınız kontrol ediliyor", "dikkat gerekli", "lütfen birkaç saniye bekleyin",
+        "erişim reddedildi", "çerezleri etkinleştirin", "tarayıcınız yönlendirilecek",
+        "güvenlik kontrolü yapılıyor", "erişim için son bir adım",
+        "cloudflare tarafından korunmaktadır", "ddos koruması",
+        "insan olduğunuz doğrulanıyor", "bu birkaç saniye sürebilir",
+        "doğrulama beklenenden uzun sürüyor", "bağlantı güvenliği inceleniyor",
+        "insan olduğunuzu doğrulayın", "bağlantınızın güvenliğini gözden geçirmesi gerekiyor",
 
-    # Türkçe karşılıkları
-    "tarayıcınız kontrol ediliyor",
-    "dikkat gerekli",
-    "lütfen birkaç saniye bekleyin",
-    "erişim reddedildi",
-    "çerezleri etkinleştirin",
-    "tarayıcınız yönlendirilecek",
-    "güvenlik kontrolü yapılıyor",
-    "erişim için son bir adım",
-    "cloudflare tarafından korunmaktadır",
-    "ddos koruması",
-    "insan olduğunuz doğrulanıyor",
-    "bu birkaç saniye sürebilir",
-    "doğrulama beklenenden uzun sürüyor",
-    "bağlantı güvenliği inceleniyor",
-    "insan olduğunuzu doğrulayın",
-    "bağlantınızın güvenliğini gözden geçirmesi gerekiyor",
+        # Yeni Türkçe
+        "lütfen bekleyin", "bir saniye...", "bağlantının güvenliğini doğrulaması gerekiyor",
+        "bir adım daha", "robot olmadığınızı doğrulayın", "güvenlik kontrolünü tamamlayın",
+        "<title>erişim engellendi</title>", "bu web sitesine erişiminiz engellendi",
+        "cloudflare tarafından performans ve güvenlik", "cloudflare tarafından ddos koruması",
 
-    # Yeni ve doğrulanmış Türkçe ifadeler
-    "lütfen bekleyin",
-    "bir saniye...",
-    "bağlantının güvenliğini doğrulaması gerekiyor",
-    "bir adım daha",
-    "robot olmadığınızı doğrulayın",
-    "güvenlik kontrolünü tamamlayın",
-    "<title>erişim engellendi</title>",
-    "bu web sitesine erişiminiz engellendi",
-    "cloudflare tarafından performans ve güvenlik",
-    "cloudflare tarafından ddos koruması"
+        # Eklenenler
+        "gerçek kişi olduğunuzu doğrulayın", "cloudflare gizlilik", "cloudflare koşullar"
     ]
 
-    for signal in cloudflare_signals:
-        if signal in page:
-            with open(block_file_path, "w", encoding="utf-8") as f:
-                f.write(f"{datetime.datetime.now()} - Cloudflare engeline takıldık. Tespit edilen ifade: '{signal}'\n")
+    signals = {s.lower() for s in default_signals}
+    if extra_signals:
+        signals.update(s.lower() for s in extra_signals)
+    return signals
 
-            print("\nCloudflare engeli tespit edildi.")
-            print(f"Tespit edilen ifade: '{signal}'")
-            print(f"Engel bilgisi şu dosyaya kaydedildi: {block_file_path}\n")
 
-            print("Bu dosya temizlenmeden program tekrar çalışmayacak.")
-            print("Lütfen engelin neden kaynaklandığını araştırın ve çözümledikten sonra tekrar deneyin.\n")
+def is_cloudflare_block(page: str, signals: list[str]) -> tuple[bool, str | None]:
+    """
+    Detects whether a webpage is being blocked or challenged by Cloudflare,
+    and returns the specific matched signal if any.
 
-            print("Olası çözüm yolları:")
-            print("'from AutomationHandler_ramcik import oc' içinden 'oc.manuel_giris_yap(URL)' fonksiyonu ile aşağıdaki adımları yapın.")
-            print("1. Google Chrome tarayıcısında şu iki adımı da gerçekleştirmiş olun:")
-            print("   - Tarayıcı seviyesinde (profil kurulumu gibi) Google hesabınızla oturum açın.")
-            print("   - gmail.com üzerinden Google hesabınıza manuel olarak giriş yapın.")
-            print("2. Engelin geldiği siteye kullanıcı girişi yaparak sürekli sizi hatılamasını sağlayın.\n")
+    This function scans the given HTML content for common phrases used by
+    Cloudflare's protection mechanisms (e.g., browser verification, DDoS protection).
+    The check is case-insensitive. If a known signal is found, it returns True along
+    with the matched phrase; otherwise, it returns False and None.
 
-            return False
+    Parameters
+    ----------
+    page : str
+        The HTML source of the webpage to be checked.
+    signals : list[str]
+        The list of phrases to search for in the HTML content.
+        This list is treated as the definitive set of Cloudflare-related signals
+        and compared case-insensitively.
 
-    return True
+    Returns
+    -------
+    tuple[bool, str | None]
+        - (True, "<matched signal>") if a Cloudflare-related phrase is found.
+        - (False, None) if no Cloudflare signal is detected in the HTML.
+
+    Example
+    -------
+    >>> from AutomationHandler_ramcik import oc
+    >>> html = driver.page_source
+    >>> signals = oc.cloudflare_signal_set()
+    >>> blocked, signal = oc.is_cloudflare_block(html, signals)
+    >>> if blocked:
+    ...     print(f"Blocked by Cloudflare. Signal: '{signal}'")
+    ... else:
+    ...     print("No block detected.")
+
+    Notes
+    -----
+    - This function only performs a keyword-based scan on the HTML source.
+    - It does NOT solve CAPTCHAs or bypass Cloudflare.
+    - Provide a cleaned, lowercase-aware signal list using cloudflare_signal_set().
+    """
+
+    cf_signals = cloudflare_signal_set(signals)      # yerleşik + ekstra
+    page_lc = page.lower()
+
+    for signal in cf_signals:
+        if signal in page_lc:
+            return True, signal
+    return False, None
+
+def click_cloudflare_turnstile(driver,
+                    cloudflare_signals,
+                    container_css="#PKVDd5",
+                    offsets=(10, 15, 20, 25, 30),
+                    wait_time=30,
+                    pause_between=0.5,
+                    detect_opts=None):
+    """
+    Attempts to bypass a Cloudflare Turnstile CAPTCHA by simulating
+    raw pixel-based clicks using the Chrome DevTools Protocol (CDP).
+
+    Parameters
+    ----------
+    driver : selenium.webdriver
+        The active Selenium WebDriver instance.
+    
+    cloudflare_signals : list[str]
+        A list of string signals that indicate the Cloudflare verification
+        is still present. If any of these strings are found in the page
+        source, the verification is considered not passed.
+        *This parameter is required.*
+    
+    container_css : str, default "#PKVDd5"
+        CSS selector for the container that wraps the Turnstile iframe.
+    
+    offsets : Iterable[int], default (10, 15, 20, 25, 30)
+        Horizontal pixel offsets from the left of the container.
+        The function tries each offset until one works.
+    
+    wait_time : int | float, default 30
+        Maximum time (in seconds) to wait for the Turnstile container
+        to appear on the page.
+    
+    pause_between : float, default 0.5
+        Delay (in seconds) between click attempts, allowing Turnstile
+        to react.
+    
+    detect_opts : dict or None, optional
+        Optional configuration to override `detect_network_activity()` behavior.
+        Supports:
+            - max_checks: int → Number of polling attempts
+            - poll_interval: float → Seconds between polls
+            - change_threshold: int → Minimum new responses to detect change
+        
+        Example:
+            detect_opts = {
+                "max_checks": 5,
+                "poll_interval": 0.25,
+                "change_threshold": 2
+            }
+
+    Returns
+    -------
+    bool
+        True  → CAPTCHA was successfully bypassed  
+        False → All click attempts failed or challenge remained on the page
+
+    Notes
+    -----
+    - Uses `Input.dispatchMouseEvent` via CDP to click without directly
+      accessing Shadow DOM or iframe internals.
+    - Calls `oc.wait_for_page_render()` after a successful click to
+      ensure the page is fully loaded.
+    - If all attempts fail, manual intervention or proxy/IP rotation
+      may be required due to aggressive anti-bot protection.
+    - `detect_opts` allows customizing detection logic without bloating
+      the function signature.
+    """
+
+    detect_opts = detect_opts or {}  
+
+    wait = WebDriverWait(driver, wait_time)
+    container = wait.until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, container_css))
+    )
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block:'center'});", container
+    )
+
+    h = container.rect["height"]
+    base_y = container.location["y"] + h / 2
+    base_x = container.location["x"]
+
+    for off in offsets:
+        click_x, click_y = base_x + off, base_y
+
+        # (İsteğe bağlı) hedef işaretçisi – yoruma alabilirsin
+        driver.execute_script(
+            """
+            const m=document.createElement('div');
+            m.id='aim';
+            m.style=`position:fixed;left:${arguments[0]-5}px;top:${arguments[1]-5}px;
+                     width:10px;height:10px;background:red;border-radius:50%;
+                     z-index:999999;pointer-events:none`;
+            document.body.appendChild(m);
+            """,
+            click_x,
+            click_y,
+        )
+
+        # CDP ham tıklama
+        for t in ("mousePressed", "mouseReleased"):
+            driver.execute_cdp_cmd(
+                "Input.dispatchMouseEvent",
+                {
+                    "type": t,
+                    "x": click_x,
+                    "y": click_y,
+                    "button": "left",
+                    "clickCount": 1,
+                },
+            )
+
+        # İşaretçiyi kaldır
+        driver.execute_script("document.getElementById('aim')?.remove()")
+        time.sleep(pause_between)
+        
+        # Başarı kontrolü
+        if detect_network_activity(driver, **detect_opts):
+            print(f"🎉  Turnstile {off}px ofsetinde tıklandı!")
+
+            wait_for_network_stabilization(driver)
+            wait_for_page_render(driver)
+
+            page_lower = driver.page_source.lower()
+            if any(signal.lower() in page_lower for signal in cloudflare_signals):
+                print(f"⚠️  Turnstile {off}px ofsetinde tıklanmasına rağmen geçilemedi!")
+                return False
+
+            return True  # başarılı ofset
+        
+
+    print("⚠️  Turnstile'ı otomatik geçemedim. Manuel müdahale gerekebilir.")
+    return False  # tüm denemeler başarısız
+
+def log_cloudflare_block(block_file_path, signal):
+
+    with open(block_file_path, "w", encoding="utf-8") as f:
+        f.write(f"{datetime.datetime.now()} - Cloudflare engeline takıldık. Tespit edilen ifade: '{signal}'\n")
+
+    print("\nCloudflare engeli tespit edildi.")
+    print(f"Tespit edilen ifade: '{signal}'")
+    print(f"Engel bilgisi şu dosyaya kaydedildi: {block_file_path}\n")
+
+    print("Bu dosya temizlenmeden program tekrar çalışmayacak.")
+    print("Lütfen engelin neden kaynaklandığını araştırın ve çözümledikten sonra tekrar deneyin.\n")
+
+    print("Olası çözüm yolları:")
+    print("'from AutomationHandler_ramcik import oc' içinden 'oc.manuel_giris_yap(URL)' fonksiyonu ile aşağıdaki adımları yapın.")
+    print("1. Google Chrome tarayıcısında şu iki adımı da gerçekleştirmiş olun:")
+    print("   - Tarayıcı seviyesinde (profil kurulumu gibi) Google hesabınızla oturum açın.")
+    print("   - gmail.com üzerinden Google hesabınıza manuel olarak giriş yapın.")
+    print("2. Engelin geldiği siteye kullanıcı girişi yaparak sürekli sizi hatılamasını sağlayın.\n")
+
+
+
+
+def check_cloudflare_block(
+    driver,
+    block_file_path: str,
+    extra_signals: list[str] | None = None,
+    click_opts: dict | None = None,
+    detect_opts: dict | None = None,
+) -> bool:
+    """
+    Orchestrates Cloudflare handling:
+
+        1. Build the full signal set (default + extra).
+        2. Detect a Cloudflare block on the current page.
+        3. If blocked, try to beat the Turnstile CAPTCHA.
+        4. If still blocked, log details to disk.
+
+    Parameters
+    ----------
+    driver : selenium.webdriver
+        Active WebDriver already on the target page.
+    block_file_path : str
+        File path to write block information if bypass fails.
+    extra_signals : list[str] | None, optional
+        Extra Cloudflare phrases merged into the default set.
+    click_opts : dict | None, optional
+        Additional keyword arguments passed directly to `click_cloudflare_turnstile`.
+        These control how the click simulation behaves.
+
+        Supported keys:
+            - container_css (str): CSS selector for Turnstile container. Default: "#PKVDd5"
+            - offsets (tuple[int]): Pixel offsets for click positions. Default: (10, 15, 20, 25, 30)
+            - wait_time (int | float): Max wait for container. Default: 30
+            - pause_between (float): Delay between click attempts. Default: 0.5
+
+    detect_opts : dict | None, optional
+        Extra configuration passed to `click_cloudflare_turnstile` to customize
+        network change detection after clicking.
+
+        Supported keys (passed into `detect_network_activity()`):
+            - max_checks (int): How many times to poll for changes.
+            - poll_interval (float): Wait between checks (in seconds).
+            - change_threshold (int): Minimum number of responses needed to assume success.
+
+    Returns
+    -------
+    bool
+        True  → Page is accessible (never blocked or CAPTCHA solved)  
+        False → Block persists and was logged to *block_file_path*
+    """
+    click_opts = click_opts or {}
+
+    # 1️⃣  Tüm sinyalleri hazırla
+    signals = list(cloudflare_signal_set(extra_signals))
+
+    # 2️⃣  İlk engel tespiti
+    blocked, matched = is_cloudflare_block(driver.page_source, signals)
+    if not blocked:
+        return True  # ✅ Cloudflare duvarı yok
+
+    # 3️⃣  Turnstile tıklamayı dene
+    solved = click_cloudflare_turnstile(
+        driver,
+        cloudflare_signals=signals,
+        detect_opts=detect_opts,
+        **click_opts,
+    )
+    if solved:
+        return True  # 🎉 CAPTCHA geçildi
+
+    # 4️⃣  Hâlâ engelli → logla ve başarısız dön
+    log_cloudflare_block(block_file_path, matched or "unknown signal")
+    return False
+
 
 def check_previous_block_status(block_file_path):
     """
@@ -3339,7 +3789,6 @@ def check_previous_block_status(block_file_path):
                 print(f"Daha önce Cloudflare engeline takıldık:\n{content.strip()}")
                 print("Şüphe çekmemek için script çalıştırılmıyor.")
                 exit()
-
 
 
 ##################### Yapay zeka fonksiyomları ############################
