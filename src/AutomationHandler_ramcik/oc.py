@@ -594,6 +594,11 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                     if wait_for_network_stabilization(driver):
                         if wait_for_page_render(driver):
                             print("WhatsApp Web tamamen yüklendi, mesaj göndermeye hazır.")
+                            try:
+                                dialog = driver.find_element("xpath", '//div[@role="dialog"]')
+                                driver.execute_script("arguments[0].remove();", dialog)
+                            except NoSuchElementException:
+                                print("Dialog not found. Skipping removal.")
                     else:
                         print("Yükleme tamamlanmadı, lütfen tekrar deneyin.")
                     return False # giriş yapıldı
@@ -607,6 +612,11 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                 if wait_for_network_stabilization(driver):
                     if wait_for_page_render(driver):
                         print("WhatsApp Web tamamen yüklendi, mesaj göndermeye hazır.")
+                        try:
+                            dialog = driver.find_element("xpath", '//div[@role="dialog"]')
+                            driver.execute_script("arguments[0].remove();", dialog)
+                        except NoSuchElementException:
+                            print("Dialog not found. Skipping removal.")
                 else:
                     print("Yükleme tamamlanmadı, lütfen tekrar deneyin.")
                 return False # Zaten giriş yapılmış
@@ -3696,45 +3706,78 @@ def check_cloudflare_block(
     detect_opts: dict | None = None,
 ) -> bool:
     """
-    Orchestrates Cloudflare handling:
+    Detects and attempts to bypass Cloudflare protection mechanisms.
 
-        1. Build the full signal set (default + extra).
-        2. Detect a Cloudflare block on the current page.
-        3. If blocked, try to beat the Turnstile CAPTCHA.
-        4. If still blocked, log details to disk.
+    This function checks if the current page is being blocked by Cloudflare 
+    (e.g., via a browser verification challenge or Turnstile CAPTCHA).
+    If a block is detected, it attempts to solve the Turnstile CAPTCHA by simulating
+    a click. If bypass fails, the matched signal is logged to the specified file.
+
+    Steps:
+        1. Build a set of Cloudflare-related signals (default + custom).
+        2. Detect if the page is blocked by Cloudflare.
+        3. If blocked, attempt to bypass it by clicking the Turnstile checkbox.
+        4. If still blocked, log the matched signal to disk and return it.
 
     Parameters
     ----------
     driver : selenium.webdriver
-        Active WebDriver already on the target page.
+        Active Selenium WebDriver instance on the target page.
+
     block_file_path : str
-        File path to write block information if bypass fails.
+        Path to the file where Cloudflare block information will be logged 
+        if bypass fails.
+
     extra_signals : list[str] | None, optional
-        Extra Cloudflare phrases merged into the default set.
+        Additional phrases to detect Cloudflare blocks (case-insensitive).
+        These are merged with the default signal set.
+
     click_opts : dict | None, optional
-        Additional keyword arguments passed directly to `click_cloudflare_turnstile`.
-        These control how the click simulation behaves.
+        Optional parameters forwarded to `click_cloudflare_turnstile()`.
 
         Supported keys:
-            - container_css (str): CSS selector for Turnstile container. Default: "#PKVDd5"
-            - offsets (tuple[int]): Pixel offsets for click positions. Default: (10, 15, 20, 25, 30)
-            - wait_time (int | float): Max wait for container. Default: 30
-            - pause_between (float): Delay between click attempts. Default: 0.5
+            - container_css (str): CSS selector for the Turnstile container.
+                                   Default: "#PKVDd5"
+            - offsets (tuple[int]): Pixel offsets used for clicking attempts.
+                                   Default: (10, 15, 20, 25, 30)
+            - wait_time (int | float): Maximum wait time for the container to appear.
+                                   Default: 30
+            - pause_between (float): Delay (in seconds) between click attempts.
+                                   Default: 0.5
 
     detect_opts : dict | None, optional
-        Extra configuration passed to `click_cloudflare_turnstile` to customize
-        network change detection after clicking.
+        Optional parameters forwarded to `detect_network_activity()` 
+        for detecting page refresh or content load after CAPTCHA interaction.
 
-        Supported keys (passed into `detect_network_activity()`):
-            - max_checks (int): How many times to poll for changes.
-            - poll_interval (float): Wait between checks (in seconds).
-            - change_threshold (int): Minimum number of responses needed to assume success.
+        Supported keys:
+            - max_checks (int): Maximum number of polling attempts.
+            - poll_interval (float): Time (in seconds) to wait between checks.
+            - change_threshold (int): Minimum number of responses to consider a success.
 
     Returns
     -------
-    bool
-        True  → Page is accessible (never blocked or CAPTCHA solved)  
-        False → Block persists and was logged to *block_file_path*
+    str | None
+        - `None`: Page is accessible (not blocked, or CAPTCHA was solved).
+        - `str`:  Matched Cloudflare signal if a block persists (e.g., "cloudflare ray id").
+
+    Examples
+    --------
+    >>> result = check_cloudflare_block(driver, "cloudflare_log.txt")
+    >>> if result is None:
+    ...     print("✅ Page is accessible.")
+    ... else:
+    ...     print(f"❌ Blocked by Cloudflare: {result}")
+
+    >>> # With custom detection signals and click options
+    >>> result = check_cloudflare_block(
+    ...     driver,
+    ...     block_file_path="block_log.txt",
+    ...     extra_signals=["please enable cookies", "ddos protection"],
+    ...     click_opts={"wait_time": 20, "pause_between": 0.3},
+    ...     detect_opts={"max_checks": 10, "poll_interval": 0.5}
+    ... )
+    >>> if result:
+    ...     send_alert("Cloudflare block detected:", result)
     """
     click_opts = click_opts or {}
 
@@ -3744,7 +3787,7 @@ def check_cloudflare_block(
     # 2️⃣  İlk engel tespiti
     blocked, matched = is_cloudflare_block(driver.page_source, signals)
     if not blocked:
-        return True  # ✅ Cloudflare duvarı yok
+        return None  # ✅ Cloudflare duvarı yok
 
     # 3️⃣  Turnstile tıklamayı dene
     solved = click_cloudflare_turnstile(
@@ -3754,11 +3797,11 @@ def check_cloudflare_block(
         **click_opts,
     )
     if solved:
-        return True  # 🎉 CAPTCHA geçildi
+        return None  # 🎉 CAPTCHA geçildi
 
     # 4️⃣  Hâlâ engelli → logla ve başarısız dön
     log_cloudflare_block(block_file_path, matched or "unknown signal")
-    return False
+    return matched or "unknown signal"
 
 
 def check_previous_block_status(block_file_path):
