@@ -12,7 +12,8 @@ Effortless automation for **Email**, **WhatsApp**, and **Telegram** via Selenium
 3. [Editing Env Variables](#edit-created-myenvfileenv)
 4. [Setting up Env Variables](#setting-up-environmental-variables)
 5. [Opening WhatsApp Profiles](#opening-whatsapp-profiles)
-6. [Congratulations! Start Using the Library🔥](#congratulations-start-using-the-library)
+6. [Using SMS Automation](#using-sms-automation)
+7. [Congratulations! Start Using the Library🔥](#congratulations-start-using-the-library)
 
 ---
 
@@ -320,9 +321,73 @@ For Windows users, if you face a similar error:
 4. Select your user account from the list, then check the **Full Control** box under **Permissions**.
 5. Click **Apply** and then **OK** to save the changes.
 
+---
+# 🔵 6. Step - Using SMS Automation
+---
+## What is SMS Automation?
+
+The `SmsHandler` class lets you **automate Google Messages (messages.google.com)** to check and read SMS content directly from your PC.
+
+> ✅ **Important:**  
+> This works by opening **[Google Messages for Web](https://messages.google.com/web)**.  
+> You must **link your phone’s Google Messages app** with your computer by scanning the QR code once.  
+> It works just like WhatsApp Web. After pairing, your phone’s SMS will sync here automatically.
 
 ---
-# 🔵 6. Step - Start Using the OmnesCore Library
+
+## Features
+
+`SmsHandler` currently supports:
+
+- ✅ Checking for an SMS with timestamp “Now” or “Şimdi” and clicking it
+- ✅ Selecting the first conversation in your SMS list
+- ✅ Getting the text content of the latest received SMS
+
+**Future:** More SMS automation methods will be added to handle full conversation flow.
+
+---
+
+## Example usage
+
+```python
+from AutomationHandler_ramcik import oc
+
+# 1️⃣ Open Google Messages Web automatically
+# Use manuel_giris=True first to log in manually and save session,
+# then set manuel_giris=False for next runs to skip manual login.
+driver = oc.run_general_bot(
+    "https://messages.google.com/web/welcome",
+    block_file_name="cloudflare_block_google_sms.txt",
+    telegram_tag="me",
+    manuel_giris=False  # ✅ Set to True for first-time login!
+)
+
+sms_handler = oc.SmsHandler(driver)
+
+if sms_handler.select_sms_with_now_timestamp(timeout=250):
+    sms_text = sms_handler.get_last_sms_text_from_conversation(timeout=5)
+    print("SMS:", sms_text)
+
+input("Press Enter to exit...")
+```
+
+---
+
+## Notes
+
+- 📌 **Keep the Messages tab open** — your phone must stay connected to the internet.
+- 📌 After scanning the QR code once, your login stays active unless you log out.
+- 📌 Using your own Chrome profile helps keep sessions alive between runs.
+
+---
+
+## Extending SMS Automation
+
+You can add your own custom SMS actions as new methods inside `SmsHandler` in your library.  
+This keeps your SMS code organized and ready for more automation in the future.
+
+---
+# 🔵 7. Step - Start Using the OmnesCore Library
 ---
 # Congratulations! start using the library🔥
 ```python

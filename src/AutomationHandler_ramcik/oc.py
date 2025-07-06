@@ -595,7 +595,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                         if wait_for_page_render(driver):
                             print("WhatsApp Web tamamen yüklendi, mesaj göndermeye hazır.")
                             try:
-                                dialog = driver.find_element("xpath", '//div[@role="dialog"]')
+                                dialog = driver.find_element("xpath", '//div[@data-animate-modal-backdrop="true"]')
                                 driver.execute_script("arguments[0].remove();", dialog)
                             except NoSuchElementException:
                                 print("Dialog not found. Skipping removal.")
@@ -613,7 +613,7 @@ def check_for_qr_code(driver: webdriver, phone_country_code: str = None, phone_n
                     if wait_for_page_render(driver):
                         print("WhatsApp Web tamamen yüklendi, mesaj göndermeye hazır.")
                         try:
-                            dialog = driver.find_element("xpath", '//div[@role="dialog"]')
+                            dialog = driver.find_element("xpath", '//div[@data-animate-modal-backdrop="true"]')
                             driver.execute_script("arguments[0].remove();", dialog)
                         except NoSuchElementException:
                             print("Dialog not found. Skipping removal.")
@@ -3285,6 +3285,12 @@ def manuel_giris_yap(URL: str,
 
     # Chrome seçenekleri yapılandırılır
     options = uc.ChromeOptions()
+    
+    abs_path = os.path.abspath(undetected_chrome_profile_path)
+    undetected_chrome_profile_path = abs_path
+
+    os.makedirs(undetected_chrome_profile_path, exist_ok=True)
+    os.makedirs(os.path.join(undetected_chrome_profile_path, profile_directory), exist_ok=True)
 
     # Kalıcı profil ve dizin ayarlarını uygula
     options.add_argument(f"--user-data-dir={undetected_chrome_profile_path}")
@@ -3379,6 +3385,12 @@ def launch_undetected_bot_browser(URL: str,
     options.add_argument(f"--user-data-dir={undetected_chrome_profile_path}")
     options.add_argument(f"--profile-directory={profile_directory}")
 
+    abs_path = os.path.abspath(undetected_chrome_profile_path)
+    undetected_chrome_profile_path = abs_path
+
+    os.makedirs(undetected_chrome_profile_path, exist_ok=True)
+    os.makedirs(os.path.join(undetected_chrome_profile_path, profile_directory), exist_ok=True)
+
     # Dil ve user-agent ayarları
     options.add_argument(f"--lang={language}")
     options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
@@ -3398,6 +3410,87 @@ def launch_undetected_bot_browser(URL: str,
     time.sleep(3)  # Allow page to fully load
 
     return driver
+
+def run_general_bot(
+    target_url,
+    profile_path=os.getenv("UCHROME_PROFILE_PATH"),
+    block_file_name="cloudflare_block.txt",
+    telegram_tag="me",
+    manuel_giris=False
+):
+    """
+    Launch a general-purpose Selenium bot with an undetected Chrome profile.
+
+    This function handles:
+    - Killing any existing Chrome processes that use the specified profile.
+    - Checking for any previous Cloudflare blocks.
+    - Starting a new undetected Chrome instance.
+    - Navigating to the target URL.
+    - Performing Cloudflare check after page load.
+
+    Parameters:
+        target_url (str): The URL to open in the browser. (Required)
+        profile_path (str, optional): Chrome profile path. If not provided, uses the UCHROME_PROFILE_PATH env variable.
+        block_file_name (str): The name of the file used to store Cloudflare block status.
+                               Default is "cloudflare_block.txt".
+        telegram_tag (str): Telegram recipient identifier for notifications.
+                            Default is "me".
+        manuel_giris (bool): If True, opens the browser for manual login.
+                             If False, runs in automation mode.
+                             Default is False.
+
+    Returns:
+        driver (selenium.webdriver): The initialized Selenium WebDriver instance.
+
+    Raises:
+        Exception: If a Cloudflare block is detected or any other error occurs during setup.
+
+    Example:
+        >>> driver = run_general_bot(
+        ...     target_url="https://messages.google.com/web/welcome",
+        ...     manuel_giris=True
+        ... )
+        >>> # Do something with driver...
+        >>> driver.quit()
+    """
+
+    block_file_path = block_file_name
+
+    if profile_path:
+        os.makedirs(profile_path, exist_ok=True)
+    kill_chrome_by_profile(profile_path)
+
+    driver = None
+
+    try:
+        check_previous_block_status(block_file_path)
+
+        driver = launch_undetected_bot_browser(
+            "about:blank",
+            undetected_chrome_profile_path=profile_path,
+            manuel_giris=manuel_giris
+        )
+        wait = WebDriverWait(driver, 20)
+
+        driver.get(target_url)
+        wait_for_network_stabilization(driver)
+        wait_for_page_render(driver)
+
+        if check_cloudflare_block(driver, block_file_path):
+            send_telegram_message_with_bot(
+                f"Cloudflare block detected: {block_file_path}", telegram_tag
+            )
+            raise Exception("Cloudflare block detected")
+
+        return driver
+
+    except Exception as e:
+        if driver:
+            driver.quit()
+        send_telegram_message_with_bot(
+            f"🚨 *{block_file_name}-BOT ERROR!*\n```{str(e)}```", telegram_tag
+        )
+        raise e
 
 def kill_chrome_by_profile(undetected_chrome_profile_path: str = os.getenv('UCHROME_PROFILE_PATH')):
     """
@@ -4208,3 +4301,119 @@ class ChatGPT:
 globalChatGpt = ChatGPT("chatGPT_config.json")
 
 #### ChatGPT ####
+
+
+
+################### google sms bağlantısı ile sms'leri kontrol etme ##############
+
+
+class SmsHandler:
+    """
+    Handles SMS operations like:
+    - Checking for 'Now' or 'Şimdi' timestamp
+    - Selecting the first conversation
+    - Reading the latest SMS text
+    """
+
+    def __init__(self, driver):
+        """
+        Args:
+            driver: Selenium WebDriver instance.
+        """
+        self.driver = driver
+
+    def select_sms_with_now_timestamp(self, timeout=30):
+        """
+        Checks if there is any SMS conversation with timestamp 'Now' or 'Şimdi'
+        and clicks it if found.
+
+        Args:
+            timeout (int): Max wait time in seconds.
+
+        Returns:
+            bool: True if found and clicked, False otherwise.
+
+        Example:
+            >>> sms_handler.check_sms_timestamp_now(timeout=20)
+        """
+        wait = WebDriverWait(self.driver, timeout)
+
+        try:
+            timestamp_element = wait.until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//mws-relative-timestamp[contains(text(), 'Now') or contains(text(), 'Şimdi')]"
+                    )
+                )
+            )
+            list_item = timestamp_element.find_element(By.XPATH, "./ancestor::a[@role='option']")
+            list_item.click()
+            #print("✅ 'Now' or 'Şimdi' SMS clicked!")
+            return True
+
+        except Exception as e:
+            print(f"⛔ Error: {e}")
+            return False
+
+    def select_first_sms_conversation(self, timeout=10):
+        """
+        Selects the first SMS conversation in the messages list.
+
+        Args:
+            timeout (int): Max wait time in seconds.
+
+        Returns:
+            bool: True if clicked, False if not found.
+
+        Example:
+            >>> sms_handler.select_first_sms_conversation(timeout=5)
+        """
+        wait = WebDriverWait(self.driver, timeout)
+        try:
+            first_message = wait.until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, ".conv-container .list-item"))
+            )
+            first_message.click()
+            #print("✅ First SMS conversation selected.")
+            return True
+        except Exception as e:
+            print(f"⛔ Could not select first SMS conversation: {e}")
+            return False
+
+    def get_last_sms_text_from_conversation(self, timeout=10):
+        """
+        Retrieves the text content of the latest received SMS
+        from the currently open conversation.
+
+        Args:
+            timeout (int): Max wait time in seconds.
+
+        Returns:
+            str: Latest SMS text.
+
+        Example:
+            >>> text = sms_handler.get_last_sms_text_from_conversation(timeout=5)
+        """
+        wait = WebDriverWait(self.driver, timeout)
+        try:
+            message_wrappers = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "mws-message-wrapper"))
+            )
+
+            last_message_wrapper = message_wrappers[-1]
+
+            last_message_text_div = last_message_wrapper.find_element(
+                By.CSS_SELECTOR, "div.text-msg-content div.text-msg"
+            )
+
+            #print(f"✅ Last SMS text: {last_message_text_div.text}")
+            return last_message_text_div.text
+
+        except Exception as e:
+            print(f"⛔ Could not get last SMS text: {e}")
+            return ""
+        
+
+
+################### google sms bağlantısı ile sms'leri kontrol etme ##############
