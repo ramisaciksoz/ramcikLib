@@ -3381,15 +3381,15 @@ def launch_undetected_bot_browser(URL: str,
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--start-maximized")
 
-    # Kalıcı profil ve dizin ayarlarını uygula
-    options.add_argument(f"--user-data-dir={undetected_chrome_profile_path}")
-    options.add_argument(f"--profile-directory={profile_directory}")
-
     abs_path = os.path.abspath(undetected_chrome_profile_path)
     undetected_chrome_profile_path = abs_path
 
     os.makedirs(undetected_chrome_profile_path, exist_ok=True)
     os.makedirs(os.path.join(undetected_chrome_profile_path, profile_directory), exist_ok=True)
+
+    # Kalıcı profil ve dizin ayarlarını uygula
+    options.add_argument(f"--user-data-dir={undetected_chrome_profile_path}")
+    options.add_argument(f"--profile-directory={profile_directory}")
 
     # Dil ve user-agent ayarları
     options.add_argument(f"--lang={language}")
