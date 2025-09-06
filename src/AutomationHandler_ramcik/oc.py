@@ -38,8 +38,9 @@ from telethon import functions  # Telegram API'nin gelişmiş fonksiyonlarını 
 import unicodedata  # Unicode karakterlerin normalleştirilmesi (örn. aksan temizliği) için kullanılır
 import undetected_chromedriver as uc  # Chrome tarafından tespit edilmeden Selenium kullanmak için özel WebDriver
 import pyperclip  # Panoya (clipboard) metin kopyalayıp yapıştırmak için kullanılır
-import json
-import psutil
+import unicodedata # Unicode karakterleri standart forma dönüştürmek için (örn. accent farklarını eşitlemek)
+import json   # JSON (JavaScript Object Notation) formatındaki verileri okumak, yazmak ve dönüştürmek için
+import psutil # Sistem ve donanım bilgilerine erişmek için (CPU, RAM, disk, ağ kullanımı gibi)
 ### sms atma fonksiyonu
 
 
@@ -4023,96 +4024,144 @@ class ChatGPT:
         # print("  aria-label :", aria)
         # print("  data-testid:", test_id)
 
-    def __find_next_conversation_turn(self ,target_text, timeout=300):
+    def __find_next_conversation_turn(self, timeout=300):
         """
-        Finds the assistant's response element that directly follows a specific user prompt
-        in a ChatGPT conversation, based on the 'data-testid' convention used in the DOM.
+        Locate the assistant's reply that immediately follows the most recent
+        user turn in the current conversation (index-based; no text matching).
 
-        This function works by:
-        - Searching all elements with data-testid starting with 'conversation-turn-'.
-        - Locating the first element whose text contains the given target prompt.
-        - Parsing its data-testid to extract its numeric order (e.g., conversation-turn-17).
-        - Calculating the next turn (e.g., conversation-turn-18).
-        - Waiting for the assistant's response in that next element.
-        - Ensuring the assistant's reply is fully loaded by waiting for the 'Read aloud' button.
+        How it works:
+        - Scans all elements with data-testid="conversation-turn-<N>".
+        - Finds the highest-indexed turn authored by the user (the latest user turn).
+        - Waits for the assistant reply in "conversation-turn-<N+1>".
+        - Defends against stale references by re-querying elements and requiring
+            visibility and non-empty text.
+
+        Assumptions:
+        - Call this right after sending a prompt. The latest user turn is expected
+            to be the one you just sent.
 
         Args:
-            target_text (str): The exact prompt previously sent to ChatGPT that we are tracking.
-            timeout (int): Max wait time in seconds. Default is 300.
+            timeout (int): Maximum time (in seconds) to wait for the containers and
+                the assistant reply to be fully available. Default: 300.
 
         Returns:
-            tuple(WebElement, str) or (None, None): 
-                The assistant's response element and its testid, or (None, None) if not found.
+            tuple[WebElement, str] | (None, None):
+                (assistant_element, "conversation-turn-<N+1>") if found, otherwise (None, None).
+
+        Raises:
+            RuntimeError: If the Selenium driver is not set (call set_driver(...) first).
         """
         if not self.driver:
             raise RuntimeError("Driver is not set. Call set_driver(driver) first.")
-
+        
+        print("Waiting for assistant's reply...")
+        
         wait = WebDriverWait(self.driver, timeout)
 
-        try:
-            # Tüm conversation-turn elementlerini bul
-            all_turns = wait.until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, '[data-testid^="conversation-turn-"]'))
-            )
-
-            # Hedef metni içeren ilk conversation-turn'ü bul
-            matching_elem = None
-            for elem in all_turns:
-                if target_text in elem.text:
-                    matching_elem = elem
-                    break
-
-            if not matching_elem:
-                print("Target prompt not found in any conversation turn.")
-                return None, None
-
-            data_testid = matching_elem.get_attribute("data-testid")
-            
-
-            match = re.search(r"conversation-turn-(\d+)", data_testid)
-            if not match:
-                print(f"Invalid data-testid format: {data_testid}")
-                return None, None
-
-            next_index = int(match.group(1)) + 1
-            next_testid = f"conversation-turn-{next_index}"
-            
-            
-            # Sonraki elementi bekle ve yakala
-            next_elem = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, f'[data-testid="{next_testid}"]'))
-            )
-            response_element = next_elem.find_element(By.CSS_SELECTOR, '[data-message-author-role="assistant"]')
-
-
-            print("Waiting for assistant's reply...")
-
-            # Wait for either the 'I prefer this response' button or the 'Read aloud' button to appear
-            self.__wait_ready_response(next_testid, timeout = timeout)
-
-            # If the 'I prefer this response' button exists, click it, then wait for the 'Read aloud' button to load
+        def parse_turn_index(elem):
             try:
-                prefer_button = next_elem.find_element(By.XPATH, './/button[@data-testid="paragen-prefer-response-button"]')
-                if prefer_button:
-                    prefer_button.click()
-                    # Wait for either the 'I prefer this response' button or the 'Read aloud' button to appear
-                    self.__wait_ready_response(next_testid, timeout = timeout)
-                    
-            except:
+                testid = elem.get_attribute("data-testid") or ""
+                m = re.search(r"conversation-turn-(\d+)", testid)
+                return int(m.group(1)) if m else None
+            except Exception:
+                return None
+
+        # Taze, görünür bir elementi güvenle yakalamak için küçük yardımcılar:
+        def wait_fresh_visible(css, max_timeout=timeout):
+            """visibility_of_element_located + stale yakala + yeniden dene"""
+            end = time.time() + max_timeout
+            last_err = None
+            while time.time() < end:
+                try:
+                    el = WebDriverWait(self.driver, 5).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, css))
+                    )
+                    # dokunup stale mı test edelim
+                    _ = el.tag_name
+                    return el
+                except (StaleElementReferenceException, TimeoutException, NoSuchElementException) as e:
+                    last_err = e
+                    time.sleep(0.2)
+                    continue
+            raise last_err or TimeoutException(f"Timeout waiting for fresh visible: {css}")
+
+        def wait_text_nonempty(css, max_timeout=timeout):
+            """Elemanın text'i boş olmayana kadar tazeleyerek bekle"""
+            end = time.time() + max_timeout
+            last_err = None
+            while time.time() < end:
+                try:
+                    el = self.driver.find_element(By.CSS_SELECTOR, css)
+                    _ = el.tag_name  # stale testi
+                    txt = (el.text or "").strip()
+                    if txt:
+                        return el
+                except (StaleElementReferenceException, NoSuchElementException) as e:
+                    last_err = e
+                time.sleep(0.2)
+            # Son bir kez görünür yakalamayı dene, text boş gelebilir ama çağıran taraf normalize eder
+            try:
+                return wait_fresh_visible(css, max_timeout=3)
+            except Exception as e:
+                raise last_err or e
+
+        # 1) En son user turn'ünü bul
+        deadline = time.time() + timeout
+        last_user_idx = None
+        while time.time() < deadline:
+            try:
+                turns = self.driver.find_elements(By.CSS_SELECTOR, '[data-testid^="conversation-turn-"]')
+                candidates = []
+                for el in turns:
+                    idx = parse_turn_index(el)
+                    if idx is None:
+                        continue
+                    try:
+                        el.find_element(By.CSS_SELECTOR, '[data-message-author-role="user"]')
+                        candidates.append((idx, el))
+                    except Exception:
+                        pass
+                if candidates:
+                    candidates.sort(key=lambda x: x[0])
+                    last_user_idx, _ = candidates[-1]
+                    break
+            except Exception:
                 pass
-            
-            print("Assistant's reply detected.")
+            time.sleep(0.2)
 
-            next_elem = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, f'[data-testid="{next_testid}"]'))
-            )
+        if last_user_idx is None:
+            print("No user turn found in DOM.")
+            return None, None
 
-            response_element = next_elem.find_element(By.CSS_SELECTOR, '[data-message-author-role="assistant"]')
+        # 2) N+1 assistant turn'ünü bekle (her erişimde tazele)
+        next_id = last_user_idx + 1
+        next_testid = f"conversation-turn-{next_id}"
+        container_css = f'[data-testid="{next_testid}"]'
+        assistant_css = f'{container_css} [data-message-author-role="assistant"]'
 
-            return response_element, next_testid 
+        try:
+            # Önce konteyner görünür olsun
+            next_elem = wait_fresh_visible(container_css, max_timeout=timeout)
+
+            # Scrollda görünür olsun (stale'ı azaltır)
+            try:
+                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", next_elem)
+            except Exception:
+                pass
+
+            # Sonra assistant mesajı görünür ve boş olmayan metinle gelsin
+            response_element = wait_text_nonempty(assistant_css, max_timeout=timeout)
+
+            # (Varsa) tam-yüklendi bekleyicisi
+            try:
+                self.__wait_ready_response(next_testid, timeout=timeout)
+            except Exception:
+                pass
+
+            return response_element, next_testid
 
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"Failed to locate assistant turn for user turn {last_user_idx}: {e}")
             return None, None
 
 
@@ -4247,24 +4296,40 @@ class ChatGPT:
 
         return None
 
-    def get_formatted_response(self, prompt, timeout: int = 300):
+    def get_formatted_response(self, timeout: int = 300):
         """
-        Retrieves the assistant's response element following a given user prompt from a ChatGPT conversation,
-        and returns its text content in the format provided by the assistant (e.g., a raw string, JSON, YAML).
+        Return the text of the assistant's reply that immediately follows the most
+        recent user message in the current ChatGPT conversation.
 
-        This function:
-        - Locates the prompt in the chat history by matching its text content.
-        - Identifies the following assistant reply element based on conversation turn order.
-        - Waits for the assistant's full response to be rendered (using 'Read aloud' indicator).
-        - Checks for any error states in the response container.
-        - Returns the full text content of the assistant's reply element.
+        This method no longer matches prompts by text. Instead, it relies on turn
+        indices:
+        - Internally calls __find_next_conversation_turn(timeout=...) which
+            locates the latest user turn (conversation-turn-<N>) and waits for the
+            assistant reply in conversation-turn-<N+1>.
+        - __find_next_conversation_turn also waits until the reply is fully
+            rendered (via the class's ready-state helper, if available).
+
+        After locating the reply container, this method checks for error states via
+        __check_error(<testid>). If an error is detected, it returns None. Otherwise,
+        it returns the assistant reply's text (stripped). If the element is present
+        but empty, it returns None.
 
         Args:
-            prompt (str): The prompt string that was previously submitted to ChatGPT.
-            timeout (int, optional): Maximum wait time in seconds for required elements to appear. Default is 300 seconds.
+            timeout (int): Maximum time in seconds to wait for the DOM elements and
+                the reply to become available. Default: 300.
 
         Returns:
-            str or None: The full text content of the assistant's response (raw string or formatted), or None if an error occurs.
+            str | None: The assistant's reply text (with surrounding whitespace
+            removed), or None if an error occurred or the reply is empty.
+
+        Raises:
+            RuntimeError: If the Selenium driver is not set (call set_driver(...) first).
+
+        Notes:
+            - This index-based approach is resilient to UI truncation and Unicode
+            variations because it avoids text matching entirely.
+            - The variable commonly named `next_testid_index` in this method refers
+            to the reply container's test id string (e.g., "conversation-turn-42").
         """
 
         if not self.driver:
@@ -4272,7 +4337,7 @@ class ChatGPT:
 
         try:
             # Wait for the assistant's reply element that follows the given prompt
-            response_element, next_testid_index = self.__find_next_conversation_turn(prompt, timeout=timeout)
+            response_element, next_testid_index = self.__find_next_conversation_turn(timeout=timeout)
             
             # Check if the assistant's response contains an error
             if self.__check_error(next_testid_index):
